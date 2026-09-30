@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.0] - 2026-09-30
+
+### Added
+- Wizard detects Claude Code and checks if the Superpowers plugin (`superpowers@superpowers-marketplace`) is installed, offering 1-click installation.
+- Documented the Subagent Dual-Control workflow and Superpowers setup in README.
+
 ## [1.1.0] - 2026-09-30
 
 ### Added

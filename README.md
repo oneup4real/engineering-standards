@@ -314,6 +314,20 @@ The shared rules live in [`agents/AGENTS.global.md`](agents/AGENTS.global.md). I
 `<!-- BEGIN oneup4real/engineering-standards … -->` and `<!-- END … -->`. Don't edit inside the markers; the next
 sync overwrites it. Write project rules outside the block.
 
+### Subagent Dual-Control Workflow & Superpowers
+
+The setup wizard automatically checks if Claude Code is installed and offers to install the **Superpowers** plugin (`superpowers@superpowers-marketplace`).
+
+Superpowers powers the **Subagent Dual-Control Protocol** specified in `AGENTS.global.md`:
+1. **Planning:** Breaks tasks into atomized steps with test and acceptance criteria (`writing-plans`).
+2. **Implementer Subagents:** Dispatches dedicated, isolated implementers per task (`executing-plans` / `subagent-driven-development`).
+3. **Reviewer Subagents (Dual Control):** Spawns an independent reviewer after each step to verify code, types, architecture, and tests before moving forward.
+
+**Installation & Manual Setup:**
+```bash
+claude plugin install superpowers@superpowers-marketplace
+```
+
 **Superpowers skills** (process discipline, installed as a Claude Code plugin: `superpowers@superpowers-marketplace`):
 
 | Situation | Skill |

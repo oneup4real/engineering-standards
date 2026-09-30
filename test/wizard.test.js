@@ -55,6 +55,15 @@ describe('runWizard', () => {
     expect(d.calls.some((c) => c.startsWith('gh api') && c.includes('repos/me/demo/rulesets'))).toBe(true);
   });
 
+  it('offers to install superpowers when claude is installed and superpowers is missing', async () => {
+    const dir = await repo();
+    const home = await tempDir();
+    const d = { ...deps({ installed: ['gh', 'gitleaks', 'claude'], answers: { installSuperpowers: true } }), homeDir: home };
+    await runWizard(makeIo(dir), d);
+    expect(d.prompts.some((p) => p.id === 'installSuperpowers')).toBe(true);
+    expect(d.calls).toContain('claude plugin install superpowers@superpowers-marketplace');
+  });
+
   it('offers to install gitleaks when missing and installs only on yes', async () => {
     const dir = await repo();
     const d = deps({ installed: ['gh', 'brew'], answers: { installGitleaks: true } });
