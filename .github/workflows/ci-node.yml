@@ -33,6 +33,18 @@ on:
         description: On pull requests, minimum % of changed lines covered by tests (0 = off)
         type: number
         default: 80
+      setup-java:
+        description: Setup Java runtime for Firebase / database emulators
+        type: boolean
+        default: false
+      java-version:
+        description: Java version for emulators
+        type: string
+        default: '21'
+      build-env:
+        description: Space-separated key=val environment variables for build prerendering
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -50,6 +62,13 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           cache: npm
+
+      - name: Setup Java for database emulators
+        if: ${{ inputs.setup-java }}
+        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        with:
+          distribution: 'temurin'
+          java-version: ${{ inputs.java-version }}
 
       - name: Install dependencies
         run: npm ci
@@ -96,7 +115,12 @@ jobs:
 
       - name: Build
         if: ${{ inputs.run-build }}
-        run: ${{ inputs.build-command }}
+        run: |
+          if [ -n "${{ inputs.build-env }}" ]; then
+            eval "${{ inputs.build-env }} ${{ inputs.build-command }}"
+          else
+            ${{ inputs.build-command }}
+          fi
 
       - name: Bundle check (no confidential data in client JS)
         if: ${{ inputs.run-build && inputs.bundle-check }}

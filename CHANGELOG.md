@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.0] - 2026-09-30
+
+### Added
+- Configurable allowlist/ignore patterns for `check-files` and `pre-commit` via `checkFiles.ignore` in `.standardsrc.json`.
+- Optional Java runtime setup (`setup-java`, `java-version`) in `ci-node.yml` for Firebase Emulators.
+- Optional build-time environment variables (`build-env`) in `ci-node.yml`.
+- Full Next.js 15 & 16 compatibility in `eslint/nextjs.js` (supports both flat arrays and config objects).
+- Robust Server Action detection in `arch/index.js` supporting complex TypeScript parameter types in arrow functions.
+- Formalized Subagent Dual-Control (Implementer/Reviewer) Protocol in `AGENTS.global.md`.
+
 ## [1.0.3] - 2026-09-30
 
 ### Added

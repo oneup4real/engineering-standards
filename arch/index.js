@@ -248,6 +248,12 @@ function exportedFunctions(code) {
   for (const m of code.matchAll(new RegExp(`export\\s+const\\s+(${ID})\\s*(?::[^=]+)?=\\s*(?:async\\s*)?(?:\\([^)]*\\)|${ID})\\s*(?::[^=]+)?=>`, 'g'))) {
     add(m[1], m.index, skipSpaces(code, m.index + m[0].length));
   }
+  // export const name = [async] (args with nested parens/types) => …
+  for (const m of code.matchAll(new RegExp(`export\\s+const\\s+(${ID})\\s*(?::[^=]+)?=\\s*(?:async\\s*)?\\(`, 'g'))) {
+    const parenStart = m.index + m[0].length - 1;
+    const bodyStart = findArrowBody(code, parenStart);
+    if (bodyStart !== -1) add(m[1], m.index, bodyStart);
+  }
   return found.sort((x, y) => x.index - y.index);
 }
 
@@ -354,4 +360,18 @@ function readJson(root, rel, fallback) {
   } catch (error) {
     throw new Error(`Could not parse ${rel}: ${/** @type {Error} */ (error).message}`, { cause: error });
   }
+}
+
+/** @param {string} code @param {number} parenStart */
+function findArrowBody(code, parenStart) {
+  let depth = 0;
+  let i = parenStart;
+  for (; i < code.length; i++) {
+    if (code[i] === '(') depth++;
+    else if (code[i] === ')' && --depth === 0) break;
+  }
+  if (i >= code.length) return -1;
+  const arrowIdx = code.indexOf('=>', i);
+  if (arrowIdx === -1 || arrowIdx > i + 200) return -1;
+  return skipSpaces(code, arrowIdx + 2);
 }

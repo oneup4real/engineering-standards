@@ -16,10 +16,21 @@ export function isModuleNotFound(error) {
  * @returns {import('eslint').Linter.Config[]}
  */
 export function composeNextConfig({ vitals, ts }) {
-  if (!Array.isArray(vitals) || !Array.isArray(ts)) {
-    throw new Error('[@oneup4real/standards] eslint-config-next 16 or newer is required (flat config arrays). Upgrade eslint-config-next, or use @oneup4real/standards/eslint/base.');
+  const isExtends = (c) => Boolean(c && typeof c === "object" && !Array.isArray(c) && ("extends" in c));
+  if (isExtends(vitals) || isExtends(ts)) {
+    throw new Error("[@oneup4real/standards] eslint-config-next 16 or newer is required (flat config arrays). Upgrade eslint-config-next, or use @oneup4real/standards/eslint/base.");
   }
-  return [...vitals, ...ts];
+  const toArray = (c) => {
+    if (Array.isArray(c)) return c;
+    if (c && typeof c === "object") return [c];
+    return null;
+  };
+  const normVitals = toArray(vitals);
+  const normTs = toArray(ts);
+  if (!normVitals || !normTs) {
+    throw new Error("[@oneup4real/standards] Invalid eslint-config-next export: expected flat config array or object.");
+  }
+  return [...normVitals, ...normTs];
 }
 
 async function loadNextConfigs() {

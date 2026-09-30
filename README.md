@@ -188,7 +188,12 @@ brew install gitleaks          # Windows: winget install gitleaks
 
 Open `.standardsrc.json` and list strings that only appear in confidential data, e.g. internal IDs:
 ```json
-{ "bundleForbiddenMarkers": ["CUST-", "INTERNAL-REF-"], "bundleDir": ".next/static", "updateMode": "review" }
+{
+  "bundleForbiddenMarkers": ["CUST-", "INTERNAL-REF-"],
+  "bundleDir": ".next/static",
+  "updateMode": "review",
+  "checkFiles": { "ignore": ["templates/*.docx", "docs/**/*.pdf"] }
+}
 ```
 
 Then switch the check on in `.github/workflows/ci.yml`: `bundle-check: true`. (The wizard does both if you enter

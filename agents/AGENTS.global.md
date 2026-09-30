@@ -4,22 +4,40 @@ These rules apply to every project and every AI coding tool (Claude Code, Codex,
 Copilot, Cursor). They are binding. Project-specific rules elsewhere in this file add to them; where a
 project rule is stricter, the stricter rule wins.
 
-## 1. How to work
+## 1. How to work: Subagent Dual-Control Protocol
 
-1. **Clarify before coding.** If a requirement, interface or compliance interpretation is unclear, ask.
-   Do not guess.
-2. **Plan before multi-step changes.** Write the plan (files, signatures, tests), show it and wait for an OK.
-3. **Test first (TDD).** Write the failing test, watch it fail, write the minimal code, watch it pass.
-   Every change to source code comes with a test change; CI fails a pull request otherwise, and requires at
-   least 80% of the changed lines to be covered. Never add the `no-tests-needed` label yourself.
-4. **Debug systematically.** Find and prove the root cause before changing code. Never patch the symptom.
-5. **Verify before claiming done.** Run the Definition of Done commands and show their output.
-   "Should work" is not evidence.
-6. **Do only the task you were given.** No refactoring or restyling of unrelated code.
+Every non-trivial task (more than a single 5-line edit) MUST follow this structured subagent execution cycle:
 
-If the Superpowers skills are available, use them for these steps: `brainstorming`, `writing-plans`,
-`executing-plans`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`,
-`requesting-code-review`.
+1. **Phase 1: Spec & Step-by-Step Plan (`writing-plans`):**
+   - Break the task into atomized, numbered steps (Task 1..N) with explicit acceptance criteria, file targets, and test requirements.
+   - Save the plan in `docs/plans/` or `docs/superpowers/plans/`.
+
+2. **Phase 2: Step-by-Step Execution via Implementer Subagents (`executing-plans`):**
+   - For EACH task in the plan, dispatch a dedicated **Implementer Subagent**.
+   - The Implementer works in isolation: writes the failing test first (TDD), implements minimal code, runs typecheck and unit tests, and verifies the specific DoD for that step.
+   - The Implementer NEVER self-approves.
+
+3. **Phase 3: Independent Reviewer Subagent (Dual Control / Four-Eyes Rule):**
+   - Immediately upon completion of an implementer task, dispatch a separate **Reviewer Subagent**.
+   - The Reviewer operates with a skeptical posture:
+     - Verifies code against the original spec and layer architecture rules.
+     - Runs `npx tsc --noEmit` and the relevant test suite directly.
+     - Checks for regressions, drift, untyped `any`, and missing tests.
+   - If the Reviewer finds gaps, dispatch a **Scoped Fix & Re-Review** cycle until green.
+   - ONLY after the Reviewer approves may the main orchestrator advance to the next step.
+
+4. **Phase 4: Final System Verification & Evidence (`verification-before-completion`):**
+   - Run full project verification (`tsc`, lint, build, tests, dependency-cruiser).
+   - Present concrete terminal output as evidence before completion.
+
+5. **Universal Rules:**
+   - **Clarify before coding.** If a requirement or compliance interpretation is unclear, ask.
+   - **Test first (TDD).** Every change to source code comes with a test change; CI requires at least 80% diff coverage.
+   - **Debug systematically.** Prove root cause before editing code.
+   - **Verify before claiming done.** "Should work" is never accepted.
+   - **Do only the task you were given.** No unrelated refactoring.
+
+If Superpowers skills are available, always activate: `brainstorming`, `writing-plans`, `executing-plans`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `requesting-code-review`.
 
 ## 2. Architecture
 

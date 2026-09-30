@@ -41,6 +41,11 @@ describe('checkActionGuards', () => {
     expect(checkActionGuards({ root, guardPattern: GUARD })).toEqual([expect.objectContaining({ file: 'src/app/actions/a.ts', message: expect.stringContaining('del') })]);
   });
 
+  it('arrow function with complex nested parameters is detected', async () => {
+    const root = await project(actions('export const doSomething = async (options: { filter: () => boolean }): Promise<void> => {\n  await requireAuth();\n};\n'));
+    expect(checkActionGuards({ root, guardPattern: GUARD })).toEqual([]);
+  });
+
   it('guarded action passes', async () => {
     const root = await project(actions('export async function del(id: string) {\n  await requireAuth();\n  return id;\n}\n'));
     expect(checkActionGuards({ root, guardPattern: GUARD })).toEqual([]);
