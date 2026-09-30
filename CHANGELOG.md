@@ -3,6 +3,11 @@
 All notable changes to `@oneup4real/standards`. Versions follow [semver](https://semver.org):
 **major** = projects may need code changes, **minor** = new checks or options, **patch** = fixes.
 
+## 1.0.2 — 2026-09-30
+
+- Docs: README explains how it works technically: the three delivery channels (npm package from GitHub, reusable
+  workflows, wizard-written files), what runs at each step, a glossary, and the optional strict tsconfig step.
+
 ## 1.0.1 — 2026-09-30
 
 - Fix: the secret scan in `security.yml` now runs the pinned, checksum-verified gitleaks binary over the full history

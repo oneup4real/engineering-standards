@@ -12,7 +12,7 @@ every pull request, and improvements you make here reach every project as a norm
 
 ## Contents
 
-1. [How it works](#1-how-it-works)
+1. [How it works](#1-how-it-works): [under the hood](#11-under-the-hood-the-three-delivery-channels) · [step by step](#12-what-actually-runs-step-by-step) · [words used](#13-words-used-in-this-readme)
 2. [Quick start: new project](#2-quick-start-new-project)
 3. [Quick start: existing project](#3-quick-start-existing-project)
 4. [Make the checks mandatory on GitHub](#4-make-the-checks-mandatory-on-github)
@@ -48,6 +48,97 @@ every pull request, and improvements you make here reach every project as a norm
 - **Updates** travel one way, from here to the projects. You change a rule here and release a new version.
   Dependabot then opens a pull request in each project, and that project's CI shows whether it still passes.
 - **Project-specific rules** stay in the project. They are added *next to* the shared ones, never mixed in.
+
+### 1.1 Under the hood: the three delivery channels
+
+This repo reaches a project through **three separate channels**. Once you know them, everything else follows.
+
+```
+ engineering-standards (GitHub)                        your project
+ ─────────────────────────────                        ────────────────────────────────────────────
+ ① npm package  @oneup4real/standards   ── npm install ──▶  node_modules/@oneup4real/standards/
+    (code: CLI, wizard, checks, configs)                     + one line in package.json
+                                                             + exact commit pinned in package-lock.json
+
+ ② reusable CI workflows                ◀── fetched by GitHub ── .github/workflows/ci.yml
+    .github/workflows/ci-node.yml             on every run        ("uses: …/ci-node.yml@v1")
+    .github/workflows/security.yml
+
+ ③ small files written ONCE by the wizard ─────────────▶  eslint.config.mjs, .husky/pre-commit,
+    (they only point to ① and ②)                             AGENTS.md block, .standardsrc.json …
+```
+
+**① The npm package** (`@oneup4real/standards`)
+
+- **What it is:** a normal npm package, like `react`. It contains the command-line tool `oneup-standards` (wizard,
+  checks, hooks), the ESLint/TypeScript/Vitest/architecture configs, and the AI rules text.
+- **Where it comes from:** it is **not on the public npm registry**. npm installs it **straight from this GitHub repo**:
+  ```json
+  "devDependencies": { "@oneup4real/standards": "github:oneup4real/engineering-standards#semver:^1.0.0" }
+  ```
+  This means: "download the repo from GitHub, use the newest version tag that matches `^1.0.0`". No npm account or token
+  is needed, because the repo is public.
+- **Where it lands:** `node_modules/@oneup4real/standards/`. Its commands appear in `node_modules/.bin/`, so
+  `npx oneup-standards …` works. `package-lock.json` records the exact commit, so every machine and CI run uses the same
+  code.
+- **How it updates:** only when `package.json` changes, i.e. when you merge Dependabot's "bump @oneup4real/standards"
+  pull request.
+
+**② The reusable CI workflows**
+
+- **What they are:** GitHub Actions workflow files in *this* repo. They are **not** part of the npm package.
+- **How a project uses them:** the project's own `.github/workflows/ci.yml` is only a few lines. It says
+  `uses: oneup4real/engineering-standards/.github/workflows/ci-node.yml@v1`. On every run, **GitHub itself** fetches
+  that file from this repo and runs its steps inside the project's CI. Those steps then call the package from ① (which
+  `npm ci` installed).
+- **How they update:** `@v1` is a **tag that moves** to the latest 1.x release. So CI fixes reach every project
+  immediately, without a pull request. (Projects that chose "never update" point to a fixed tag such as `@v1.0.1`.)
+
+**③ The files the wizard writes** (once)
+
+| File in your project | Content | Points to |
+|---|---|---|
+| `eslint.config.mjs` | 3 lines: "use the shared rules" | ① `eslint/nextjs.js` |
+| `tsconfig.json` (you add `"extends"`) | "use the strict settings" | ① `tsconfig/nextjs.json` |
+| `.dependency-cruiser.cjs` | "use the layer rules" | ① `depcruise/layered.cjs` |
+| `vitest.config.ts` | "use the test preset" | ① `vitest/index.js` |
+| `tests/arch/standards.test.ts` | your guard names and folders | ① `arch/suite.js` |
+| `.husky/pre-commit`, `.husky/pre-push` | one line: `npx --no-install oneup-standards hook …` | ① the CLI |
+| `.github/workflows/ci.yml` | "run the shared pipeline" | ② |
+| `.github/dependabot.yml` | weekly update PRs | keeps ① current |
+| `AGENTS.md` (+ `CLAUDE.md`, `GEMINI.md`) | the shared AI rules, between markers | copied from ① (`sync-agents` refreshes it) |
+| `.standardsrc.json` | project settings (bundle markers, update mode) | read by ① |
+| `arch-allowlist.json`, `arch-action-gaps.json`, `.dependency-cruiser-known-violations.json` | the ratchets (existing problems) | read by ① |
+
+Because these files only *point* to the package, a rule change needs no edits in the project: the next package
+version changes the behaviour.
+
+### 1.2 What actually runs, step by step
+
+| You do… | Technically this happens |
+|---|---|
+| `npm install --save-dev github:…` | npm clones this repo at the matching tag into `node_modules`, links `oneup-standards` into `node_modules/.bin` |
+| `npx oneup-standards init` | Node runs `bin/oneup-standards.js` → the wizard detects your project, asks, writes the files from ③ |
+| `npm install` (any later time) | npm runs your `prepare` script → `husky` activates the hooks in `.husky/` |
+| `git commit` | git runs `.husky/pre-commit` → `oneup-standards hook pre-commit` → forbidden-file check, gitleaks, lint-staged |
+| `git push` | `.husky/pre-push` → TypeScript check, tests |
+| open a pull request | GitHub runs your `ci.yml` → fetches `ci-node.yml@v1` and `security.yml@v1` from this repo → they run `npm ci`, then lint, tests with coverage, TDD checks, architecture rules, build, bundle check, secret and code scans |
+| a new standards version is released | Dependabot changes the one line in `package.json` in a PR → that PR's CI shows if the project still passes |
+
+### 1.3 Words used in this README
+
+| Word | Meaning |
+|---|---|
+| **npm package** | A folder of code with a `package.json`, installed into `node_modules`. Here: `@oneup4real/standards`. |
+| **git dependency** | An npm package installed from a git repo instead of the npm registry (`github:owner/repo#…`). |
+| **tag / version** | A named point in this repo's history (`v1.0.1`). `v1` is a moving tag = "latest 1.x". |
+| **CLI** | The command-line tool `oneup-standards` inside the package. |
+| **wizard** | `oneup-standards init`: the interactive setup command. |
+| **hook** | A script git runs automatically before a commit or push. Managed by the tool *husky*. |
+| **reusable workflow** | A GitHub Actions pipeline in one repo that other repos call with `uses:`. |
+| **Dependabot** | GitHub's bot that opens pull requests to update dependencies. |
+| **ratchet / baseline** | A file listing today's known problems. Checks ignore those but fail on new ones; the list may only shrink. |
+| **skill** | Step-by-step instructions an AI tool loads for a type of task (e.g. Superpowers `test-driven-development`). There is no skill *required* to use this repo: the wizard is a normal command anyone can run. |
 
 ## 2. Quick start: new project
 
@@ -113,6 +204,12 @@ over time; the file should only ever shrink.
 **Step 6: adjust `tests/arch/standards.test.ts`**
 
 Set the names of your auth guard functions (e.g. `requireAuth|requireRole`) and your folders.
+
+**Step 6b (optional): strict TypeScript settings**
+
+The wizard does not touch `tsconfig.json`, because stricter settings can turn existing code red. When you are ready,
+add `"extends": "@oneup4real/standards/tsconfig/nextjs.json"` at the top of `tsconfig.json`, run `npx tsc --noEmit` and
+fix what it reports.
 
 **Step 7: commit and push**
 ```bash
@@ -271,6 +368,12 @@ human) wrote the code.
 More detail: [docs/architecture.md](docs/architecture.md) · [docs/adoption.md](docs/adoption.md)
 
 ## 11. FAQ
+
+**Is this an npm package?** Yes: `@oneup4real/standards`. It is installed from this GitHub repo, not from the npm
+registry (see [1.1](#11-under-the-hood-the-three-delivery-channels)).
+
+**Is "connecting a project" a skill I need?** No. Connecting = installing the package and running `npx oneup-standards init`.
+You can do it yourself, or ask any AI assistant to run those two commands. (A skill that wraps them may come later.)
 
 **Does connecting a project change anything in this repo?** No. Projects only read from here.
 
