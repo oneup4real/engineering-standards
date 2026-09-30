@@ -1,0 +1,20 @@
+# Weekly dependency updates. @oneup4real/standards gets its own PR so rule changes are easy to spot.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      dependencies:
+        patterns: ["*"]
+        exclude-patterns: ["@oneup4real/standards"]
+{{STANDARDS_IGNORE}}
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

@@ -1,0 +1,1 @@
+npx --no-install oneup-standards hook pre-push

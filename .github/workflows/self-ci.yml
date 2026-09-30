@@ -1,0 +1,51 @@
+# CI for the standards package itself (tests + workflow lint).
+name: self-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run --coverage
+      - name: Tests changed with the code (TDD)
+        if: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'no-tests-needed') }}
+        run: node bin/oneup-standards.js check-tests-changed --base "${{ github.event.pull_request.base.sha }}"
+      - name: Changed-line coverage
+        if: ${{ github.event_name == 'pull_request' }}
+        run: node bin/oneup-standards.js check-diff-coverage --base "${{ github.event.pull_request.base.sha }}" --min 80
+      - run: npm run lint
+      - name: Lint workflows (actionlint)
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/914e7df21a07ef503a81201c76d2b11c789d3fca/scripts/download-actionlint.bash) 1.7.12
+          ./actionlint -color
+
+  # Dogfooding: this repo is public, so it runs the same security scans it gives to projects (with CodeQL).
+  security:
+    uses: ./.github/workflows/security.yml
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+      pull-requests: read
+    with:
+      codeql: true

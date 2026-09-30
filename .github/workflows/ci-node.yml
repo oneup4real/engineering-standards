@@ -1,0 +1,103 @@
+# Reusable CI pipeline for Node/Next.js projects.
+# Consumers call it with: uses: oneup4real/engineering-standards/.github/workflows/ci-node.yml@v1
+name: ci-node
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Node.js version
+        type: string
+        default: '22'
+      run-build:
+        description: Run the production build
+        type: boolean
+        default: true
+      build-command:
+        description: Command that builds the project
+        type: string
+        default: npm run build
+      rules-test-command:
+        description: Command for database security-rules tests (e.g. npm run test:rules); empty = skip
+        type: string
+        default: ''
+      bundle-check:
+        description: Scan built client JS for confidential markers (.standardsrc.json)
+        type: boolean
+        default: true
+      require-tests:
+        description: On pull requests, fail when source files change without any test change (label "no-tests-needed" skips it)
+        type: boolean
+        default: true
+      min-diff-coverage:
+        description: On pull requests, minimum % of changed lines covered by tests (0 = off)
+        type: number
+        default: 80
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # full history: needed to diff a pull request against its base
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Forbidden files (documents, env files, keys)
+        run: git ls-files -z | xargs -0 npx --no-install oneup-standards check-files
+
+      - name: Lint (warnings fail too)
+        run: npx --no-install eslint . --max-warnings=0
+
+      - name: Typecheck
+        run: npx --no-install tsc --noEmit
+
+      - name: Unit tests (with coverage)
+        run: |
+          if ls vitest.config.* >/dev/null 2>&1; then
+            npx --no-install vitest run --coverage
+          else
+            echo "::warning::No vitest config: running 'npm test' without coverage thresholds."
+            npm test
+          fi
+
+      - name: Tests changed with the code (TDD)
+        if: ${{ github.event_name == 'pull_request' && inputs.require-tests && !contains(github.event.pull_request.labels.*.name, 'no-tests-needed') }}
+        run: npx --no-install oneup-standards check-tests-changed --base "${{ github.event.pull_request.base.sha }}"
+
+      - name: Changed-line coverage
+        if: ${{ github.event_name == 'pull_request' && inputs.min-diff-coverage > 0 }}
+        run: npx --no-install oneup-standards check-diff-coverage --base "${{ github.event.pull_request.base.sha }}" --min "${{ inputs.min-diff-coverage }}" --if-present
+
+      - name: Architecture rules
+        run: |
+          if [ ! -d src ]; then
+            echo "No src/ directory, skipping."
+          elif [ -f .dependency-cruiser-known-violations.json ]; then
+            npx --no-install depcruise src --config .dependency-cruiser.cjs --ignore-known
+          else
+            npx --no-install depcruise src --config .dependency-cruiser.cjs
+          fi
+
+      - name: Security rules tests
+        if: ${{ inputs.rules-test-command != '' }}
+        run: ${{ inputs.rules-test-command }}
+
+      - name: Build
+        if: ${{ inputs.run-build }}
+        run: ${{ inputs.build-command }}
+
+      - name: Bundle check (no confidential data in client JS)
+        if: ${{ inputs.run-build && inputs.bundle-check }}
+        run: npx --no-install oneup-standards check-bundle

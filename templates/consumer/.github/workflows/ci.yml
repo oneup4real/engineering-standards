@@ -1,0 +1,33 @@
+# Runs the shared pipeline from oneup4real/engineering-standards.
+# Settings are in `with:` below; the steps themselves live in the central repo.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: oneup4real/engineering-standards/.github/workflows/ci-node.yml@v1
+    with:
+      node-version: '22'
+      run-build: true
+      bundle-check: {{BUNDLE_CHECK}}
+
+  security:
+    uses: oneup4real/engineering-standards/.github/workflows/security.yml@v1
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+      pull-requests: read
+    with:
+      node-version: '22'
+      codeql: {{CODEQL}}
+      semgrep: {{SEMGREP}}
