@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.3] - 2026-09-30
+
+### Added
+- Setup wizard asks whether to migrate existing test scripts to Vitest (saving the old script as `test:legacy`).
+
 All notable changes to `@oneup4real/standards`. Versions follow [semver](https://semver.org):
 **major** = projects may need code changes, **minor** = new checks or options, **patch** = fixes.
 

@@ -166,7 +166,7 @@ npm install --save-dev github:oneup4real/engineering-standards#semver:^1.0.0
 ```bash
 npx oneup-standards init
 ```
-It asks 7 short questions and explains each one. Pressing Enter picks the recommended answer.
+It asks up to 8 short questions and explains each one. Pressing Enter picks the recommended answer.
 Your existing files are **never silently replaced**:
 
 | You already have… | The wizard… |

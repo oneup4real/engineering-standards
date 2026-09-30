@@ -33,12 +33,24 @@ describe('initProject', () => {
     expect(pkg.scripts.prepare).toBe('husky');
   });
 
-  it('keeps an existing test script', async () => {
+  it('keeps an existing test script when vitest answer is keep or unprompted', async () => {
     const dir = await newRepo({ name: 'x', scripts: { test: 'node --test' } });
-    const results = await initProject({ targetDir: dir, answers: RECOMMENDED_ANSWERS });
+    const results = await initProject({ targetDir: dir, answers: { ...RECOMMENDED_ANSWERS, vitest: 'keep' } });
     const pkg = JSON.parse(await read(path.join(dir, 'package.json')));
     expect(pkg.scripts.test).toBe('node --test');
     expect(results.find((r) => r.file.endsWith('vitest.config.ts')).action).toBe('skipped');
+  });
+
+  it('migrates an existing test script to vitest when vitest answer is migrate', async () => {
+    const dir = await newRepo({ name: 'x', scripts: { test: 'node --test' } });
+    const results = await initProject({ targetDir: dir, answers: { ...RECOMMENDED_ANSWERS, vitest: 'migrate' } });
+    const pkg = JSON.parse(await read(path.join(dir, 'package.json')));
+    expect(pkg.scripts.test).toBe('vitest run');
+    expect(pkg.scripts['test:legacy']).toBe('node --test');
+    expect(pkg.devDependencies.vitest).toBeDefined();
+    expect(pkg.devDependencies['@vitest/coverage-v8']).toBeDefined();
+    expect(results.find((r) => r.file.endsWith('vitest.config.ts')).action).toBe('created');
+    expect(results.find((r) => r.file.endsWith('tests/arch/standards.test.ts')).action).toBe('created');
   });
 
   it('skips existing files when answer is skip', async () => {

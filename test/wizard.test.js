@@ -62,6 +62,28 @@ describe('runWizard', () => {
     expect(d.calls).toContain('brew install gitleaks');
   });
 
+  it('asks whether to migrate an existing non-vitest test script and migrates on migrate answer', async () => {
+    const dir = await repo();
+    await fs.writeFile(path.join(dir, 'package.json'), JSON.stringify({ name: 'demo', scripts: { test: 'node --test' } }));
+    const d = deps({ answers: { vitest: 'migrate' } });
+    await runWizard(makeIo(dir), d);
+    const vitestPrompt = d.prompts.find((p) => p.id === 'vitest');
+    expect(vitestPrompt).toBeDefined();
+    expect(vitestPrompt.default).toBe('migrate');
+    const pkg = JSON.parse(await fs.readFile(path.join(dir, 'package.json'), 'utf8'));
+    expect(pkg.scripts.test).toBe('vitest run');
+    expect(pkg.scripts['test:legacy']).toBe('node --test');
+  });
+
+  it('preserves existing test script when user answers keep', async () => {
+    const dir = await repo();
+    await fs.writeFile(path.join(dir, 'package.json'), JSON.stringify({ name: 'demo', scripts: { test: 'node --test' } }));
+    const d = deps({ answers: { vitest: 'keep' } });
+    await runWizard(makeIo(dir), d);
+    const pkg = JSON.parse(await fs.readFile(path.join(dir, 'package.json'), 'utf8'));
+    expect(pkg.scripts.test).toBe('node --test');
+  });
+
   it('prints a summary with next steps', async () => {
     const dir = await repo();
     const io = makeIo(dir);
