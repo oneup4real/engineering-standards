@@ -3,6 +3,12 @@
 All notable changes to `@oneup4real/standards`. Versions follow [semver](https://semver.org):
 **major** = projects may need code changes, **minor** = new checks or options, **patch** = fixes.
 
+## 1.0.1 — 2026-09-30
+
+- Fix: the secret scan in `security.yml` now runs the pinned, checksum-verified gitleaks binary over the full history
+  instead of `gitleaks-action`. The action crashed on a repository's first push (its range started at a commit with
+  no parent), targeted the deprecated Node 20 runtime, and needs a license for organisation repositories.
+
 ## 1.0.0 — 2026-09-30
 
 First release.

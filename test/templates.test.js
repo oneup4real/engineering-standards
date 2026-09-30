@@ -59,3 +59,19 @@ describe('TDD enforcement in ci-node.yml', () => {
     expect(await fs.readFile('templates/consumer/.github/pull_request_template.md', 'utf8')).toMatch(/test first|failing test/i);
   });
 });
+
+describe('gitleaks in security.yml', () => {
+  it('runs a pinned, checksum-verified gitleaks binary over the full history', async () => {
+    const sec = await load('.github/workflows/security.yml');
+    const steps = sec.jobs.gitleaks.steps;
+    const script = steps.map((s) => s.run ?? '').join('\n');
+    expect(steps.some((s) => String(s.uses ?? '').startsWith('gitleaks/gitleaks-action'))).toBe(false);
+    const env = Object.assign({}, ...steps.map((s) => s.env ?? {}));
+    expect(env.GITLEAKS_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(env.GITLEAKS_SHA256).toMatch(/^[0-9a-f]{64}$/);
+    expect(script).toContain('gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz');
+    expect(script).toMatch(/sha256sum -c/);
+    expect(script).toMatch(/gitleaks"? git .*--redact/);
+    expect(steps[0].with['fetch-depth']).toBe(0);
+  });
+});
