@@ -1,411 +1,461 @@
 # engineering-standards
 
-**One place for the rules every project must follow: security, architecture, tests and AI-agent instructions.**
-Projects connect to it once with a setup wizard. From then on, checks run automatically before every commit and on
-every pull request, and improvements you make here reach every project as a normal update.
+**Machine-Enforced Secure SDLC, Architecture Guardrails, and AI-Agent Governance.**
 
-> **Why this exists.** Writing rules into a project's `AGENTS.md` is not enough. AI agents (and people) read them,
-> then take shortcuts anyway, and nothing notices. Here, the rules are **checked by machines**: if code breaks a rule,
-> the commit or the pull request fails.
+One source of truth for the rules every project must follow. Projects connect once via an interactive setup wizard. From then on, automated checks run before every commit and on every pull request. Central improvements automatically reach every project through standard updates, while anti-drift tooling ensures configurations remain synchronized.
 
----
-
-## Contents
-
-1. [How it works](#1-how-it-works): [under the hood](#11-under-the-hood-the-three-delivery-channels) · [step by step](#12-what-actually-runs-step-by-step) · [words used](#13-words-used-in-this-readme)
-2. [Quick start: new project](#2-quick-start-new-project)
-3. [Quick start: existing project](#3-quick-start-existing-project)
-4. [Make the checks mandatory on GitHub](#4-make-the-checks-mandatory-on-github)
-5. [What happens when](#5-what-happens-when)
-6. [A check failed. What now?](#6-a-check-failed-what-now)
-7. [Changing the rules](#7-changing-the-rules-and-how-projects-get-them)
-8. [Improving the standards from another project](#8-improving-the-standards-from-another-project-harvest)
-9. [AI tools and skills](#9-ai-tools-and-skills)
-10. [All commands](#10-all-commands)
-11. [FAQ](#11-faq)
+> **The Core Problem in Agentic Coding:** Writing rules into a project's `AGENTS.md` or system prompt is insufficient. AI coding agents (and humans under pressure) read guidelines, hallucinate compliance, take shortcuts, and commit untested or insecure code.
+>
+> In this repository, **rules are enforced by machines, not polite requests**. If an agent or developer violates architectural boundaries, skips tests, leaves confidential markers in bundles, or omits authorization guards, the commit or the pull request fails deterministically.
 
 ---
 
-## 1. How it works
+## Table of Contents
 
+1. [Secure SDLC Architecture & Flow](#1-secure-sdlc-architecture--flow)
+2. [Tools Used & Risk Mitigation Matrix](#2-tools-used--risk-mitigation-matrix)
+3. [Architectural Guardrails](#3-architectural-guardrails)
+4. [Subagent Dual-Control Protocol](#4-subagent-dual-control-protocol)
+5. [Quickstart: New Projects](#5-quickstart-new-projects)
+6. [Quickstart: Existing Projects](#6-quickstart-existing-projects)
+7. [Fleet Anti-Drift: Doctor & Upgrade](#7-fleet-anti-drift-doctor--upgrade)
+8. [Make the Checks Mandatory on GitHub](#8-make-the-checks-mandatory-on-github)
+9. [What Happens When (Pipeline Breakdown)](#9-what-happens-when-pipeline-breakdown)
+10. [A Check Failed. What Now?](#10-a-check-failed-what-now)
+11. [CLI Commands Reference](#11-cli-commands-reference)
+12. [Importable Building Blocks](#12-importable-building-blocks)
+13. [Appendices (Deep Technical Details)](#13-appendices-deep-technical-details)
+    - [Appendix A: The Three Delivery Channels](#appendix-a-the-three-delivery-channels)
+    - [Appendix B: Cryptographic Anti-Drift Fingerprinting](#appendix-b-cryptographic-anti-drift-fingerprinting)
+    - [Appendix C: Monotonic Ratchets for Legacy Migration](#appendix-c-monotonic-ratchets-for-legacy-migration)
+    - [Appendix D: TypeScript AST Guard Inspection](#appendix-d-typescript-ast-guard-inspection)
+    - [Appendix E: Supply Chain Security & Action Pinning](#appendix-e-supply-chain-security--action-pinning)
+
+---
+
+## 1. Secure SDLC Architecture & Flow
+
+The following diagram illustrates how changes travel from prompt to production across the multi-layered defense-in-depth pipeline:
+
+```mermaid
+flowchart TD
+    subgraph S1["Phase 1: Agent & Developer Workstation"]
+        Agent[AI Agent / Developer] -->|1. Test-First TDD| Code[Code + Tests]
+        Code -->|git commit| HookCommit[Husky Pre-Commit Hook]
+        HookCommit -->|Check 1| ScanFiles[oneup-standards check-files\nBlock .env, keys, office docs]
+        HookCommit -->|Check 2| GitleaksLocal[gitleaks protect --staged\nSecret Scan]
+        HookCommit -->|Check 3| LintStaged[lint-staged\neslint --max-warnings=0]
+        
+        HookCommit -->|Pass| CommitOK[Commit Staged]
+        CommitOK -->|git push| HookPush[Husky Pre-Push Hook]
+        HookPush -->|Check 4| TscLocal[tsc --noEmit\nType Validation]
+        HookPush -->|Check 5| VitestLocal[npm test\nUnit Tests Pass]
+    end
+
+    subgraph S2["Phase 2: Pull Request Gate (GitHub Actions Reusable CI)"]
+        HookPush -->|Pass & Push| PR[Pull Request Opened]
+        PR --> CI_Job[ci-node.yml @v1]
+        PR --> Sec_Job[security.yml @v1]
+        
+        CI_Job --> CI_Drift[Standards Doctor\nDetect Drift]
+        CI_Job --> CI_TDD[check-tests-changed\nFail if code changed without tests]
+        CI_Job --> CI_DiffCov[check-diff-coverage\nChanged-line coverage >= 80%]
+        CI_Job --> CI_Arch[dependency-cruiser\nLayer boundary rules]
+        CI_Job --> CI_Suite[arch/suite.js\nServer-only, Action guards, Write ratchet]
+        CI_Job --> CI_Build[npm run build\nProduction compile]
+        CI_Job --> CI_Bundle[check-bundle\nScan built JS for confidential markers]
+
+        Sec_Job --> Sec_Leaks[gitleaks --full-history\nFull repo scan]
+        Sec_Job --> Sec_Audit[npm audit\nDependency vulnerability scan]
+        Sec_Job --> Sec_SAST[Semgrep / CodeQL\nStatic Application Security Testing]
+    end
+
+    subgraph S3["Phase 3: Fleet Governance & Auto-Updates"]
+        Central[oneup4real/engineering-standards] -->|Dependabot Bump PR| ConsumerRepo[Target Project]
+        ConsumerRepo -->|oneup-standards doctor| ReportDrift[Identify Outdated Configs]
+        ConsumerRepo -->|oneup-standards upgrade| AutoUpgrade[Upgrade Templates Safely via Hashes]
+    end
 ```
-                 ┌───────────────────────────────────────────┐
-                 │   engineering-standards (this repo)        │
-                 │   rules · checks · CI pipelines · wizard   │
-                 │   released as versions: v1.0.0, v1.1.0 …   │
-                 └───────────────┬───────────────▲────────────┘
-     ① wizard connects a project │               │ ③ good ideas from a project
-     ② updates arrive as PRs     │               │   are brought back here ("harvest")
-                                 ▼               │
-          ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-          │  Project A   │  │  Project B   │  │  Project C   │
-          └──────────────┘  └──────────────┘  └──────────────┘
+
+---
+
+## 2. Tools Used & Risk Mitigation Matrix
+
+Every tool incorporated into `@oneup4real/standards` is targeted at specific real-world security vulnerabilities and common failure modes of AI coding agents:
+
+| Tool / Technology | Execution Point | Specific Threat / AI Failure Mode Prevented | Secure SDLC Impact |
+|---|---|---|---|
+| **gitleaks** | Pre-commit & CI | AI accidentally commits API keys, Firebase service account credentials, or `.env` files into git history. | **Secrets & Credential Hygiene**: Halts commits locally; audits full git history in CI. |
+| **`check-files`** | Pre-commit & CI | AI commits internal documentation (`.docx`, `.pdf`, `.xlsx`), raw keys (`.pem`, `.key`), or local environments. | **Data Leakage & Asset Sprawl**: Rejects disallowed extensions before staging. |
+| **ESLint Security Plugin** | Pre-commit & CI | Direct client writes to DB (`setDoc`, `addDoc`), secret access in `NEXT_PUBLIC_*`, `any` type casts, `dangerouslySetInnerHTML`. | **Injection & Authorization Bypass**: Guarantees writes go through server actions; stops client data poisoning. |
+| **dependency-cruiser** | CI & Pre-push | UI directly importing server adapters/database modules; circular dependencies; domain layer corruption. | **Architectural Integrity**: Enforces strict boundaries (UI → Boundary → Services → Adapters). |
+| **`arch/suite.js` (AST Scanner)** | CI (`tests/arch`) | AI creates exposed Server Actions (`'use server'`) without authentication/role guards (`requireAuth`, `requireRole`). | **Broken Object Level Authorization (BOLA/IDOR)**: Guarantees every exported action has a verified session guard. |
+| **`check-tests-changed`** | CI PR Gate | AI refactors or adds application logic but skips writing tests, claiming "it works". | **Regression Prevention & TDD**: PR fails if `src/` changes without matching test modifications. |
+| **`check-diff-coverage`** | CI PR Gate | AI writes pseudo-tests that run empty assertions or don't execute newly added logic. | **AI Slop Defense**: Requires at least 80% coverage on newly touched lines. |
+| **`check-bundle`** | CI Post-Build | Internal database IDs (e.g. `CUST-`, `INTERNAL-`) or secret constants leaked into client-side JS bundles. | **Information Disclosure**: Scans client JavaScript in `.next/static` for sensitive markers. |
+| **Semgrep / CodeQL** | CI Security Pipeline | Known insecure coding patterns, prototype pollution, SSRF, path traversal. | **SAST**: Automated vulnerability scanning on every PR. |
+| **`doctor` & `upgrade`** | Local CLI & CI | Configuration drift: projects initialized months ago missing new security patches and hook updates. | **Fleet Consistency**: Cryptographically tracks template drift and provides safe upgrades. |
+| **Superpowers Subagent Dual-Control** | Agent Runtime | Single agent "cheating" its own evaluation, hallucinating test results, or deviating from plan. | **Four-Eyes Governance**: Separates the implementer agent from an independent, fresh-context reviewer agent. |
+
+---
+
+## 3. Architectural Guardrails
+
+Applications using these standards follow a strict layered Clean Architecture:
+
+```mermaid
+graph TD
+    subgraph Presentation["1. Presentation Layer (UI)"]
+        UI["src/app, src/components, src/hooks, src/context"]
+    end
+
+    subgraph Boundary["2. Boundary Layer (Server Actions)"]
+        Action["src/app/actions, src/server/actions\n'use server' | Zod Validation | Auth Guards"]
+    end
+
+    subgraph Services["3. Services Layer"]
+        Service["src/server/services\nBusiness Logic & Orchestration"]
+    end
+
+    subgraph Adapters["4. Adapters Layer"]
+        Adapter["src/server/adapters\nFirestore Admin SDK, HTTP, Secret Manager"]
+    end
+
+    subgraph Domain["5. Domain Layer"]
+        Dom["src/domain\nPure business rules & Port interfaces"]
+    end
+
+    UI -->|Calls| Action
+    Action -->|Calls| Service
+    Service -->|Uses| Adapter
+    Service -->|Uses| Dom
+    Adapter -.->|Implements Ports| Dom
+
+    UI -.->|FORBIDDEN DIRECT CALL| Adapter
+    UI -.->|FORBIDDEN DIRECT CALL| Service
 ```
 
-- **This repo** holds the rules. It knows nothing about your projects.
-- **A project** only stores *which version* of the rules it uses (one line in `package.json`), plus a few tiny files
-  that say "use the shared rules". The wizard creates those files for you.
-- **Updates** travel one way, from here to the projects. You change a rule here and release a new version.
-  Dependabot then opens a pull request in each project, and that project's CI shows whether it still passes.
-- **Project-specific rules** stay in the project. They are added *next to* the shared ones, never mixed in.
+### Invariant Rules
+1. **Server-Only Isolation:** Every file in `src/server/` must begin with `import 'server-only';`.
+2. **Deny Client Writes:** In Firebase/Firestore apps, client security rules enforce `allow write: if false;`. All mutations go through Server Actions using the Admin SDK.
+3. **Domain Purity:** `src/domain` contains only pure logic and interfaces. It may only import `src/domain`, `src/shared`, or `zod`. No framework, UI, or database imports.
+4. **Action Contract:** All server actions return a unified response shape:
+   ```ts
+   type ActionResult<T> =
+     | { success: true; data: T }
+     | { success: false; error: string; code?: string };
+   ```
 
-### 1.1 Under the hood: the three delivery channels
+---
 
-This repo reaches a project through **three separate channels**. Once you know them, everything else follows.
+## 4. Subagent Dual-Control Protocol
 
+When AI coding tools (Claude Code, Antigravity, Cursor, Codex) execute non-trivial tasks in projects using `@oneup4real/standards`, they are bound by the **Subagent Dual-Control Protocol** defined in `AGENTS.global.md`:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Human as Human Lead
+    participant Orchestrator as Orchestrator Agent
+    participant Implementer as Implementer Subagent
+    participant Reviewer as Reviewer Subagent (Adversarial)
+    participant CI as Machine Verification (Local / CI)
+
+    Human->>Orchestrator: Request Feature / Fix
+    Orchestrator->>Orchestrator: Phase 1: Break into atomic tasks (writing-plans)
+    
+    loop For Each Step in Plan
+        Orchestrator->>Implementer: Dispatch Task Step (Isolated Context)
+        Implementer->>Implementer: Write failing test first (TDD)
+        Implementer->>Implementer: Write minimal implementation
+        Implementer->>Implementer: Run tsc & vitest
+        Implementer-->>Orchestrator: Submit Diff & DoD Claims
+        
+        Orchestrator->>Reviewer: Dispatch Review (Diff + Spec only, fresh context)
+        Reviewer->>CI: Run tsc, lint, tests, arch checks
+        CI-->>Reviewer: Command Output Evidence
+        alt Findings / Regressions Detected
+            Reviewer-->>Orchestrator: Reject with Concrete Issues
+            Orchestrator->>Implementer: Scoped Fix Loop
+        else Passes All Gates
+            Reviewer-->>Orchestrator: Approve Step
+        end
+    end
+
+    Orchestrator->>CI: Phase 4: Full System Verification (npx oneup-standards ...)
+    CI-->>Orchestrator: Evidence Output
+    Orchestrator-->>Human: Present Terminal Proof & PR Ready
 ```
- engineering-standards (GitHub)                        your project
- ─────────────────────────────                        ────────────────────────────────────────────
- ① npm package  @oneup4real/standards   ── npm install ──▶  node_modules/@oneup4real/standards/
-    (code: CLI, wizard, checks, configs)                     + one line in package.json
-                                                             + exact commit pinned in package-lock.json
 
- ② reusable CI workflows                ◀── fetched by GitHub ── .github/workflows/ci.yml
-    .github/workflows/ci-node.yml             on every run        ("uses: …/ci-node.yml@v1")
-    .github/workflows/security.yml
+### Core Rules for AI Agents
+- **No Self-Approval:** The agent that writes the implementation code must never approve its own step.
+- **Fresh-Context Skeptical Reviewer:** The reviewer subagent is launched with isolated context (only the spec, plan step, and git diff), preventing confirmation bias inherited from conversation history.
+- **Evidence Before Assertions:** Phrases like "this should work" or "all tests pass" are rejected without terminal output proof.
 
- ③ small files written ONCE by the wizard ─────────────▶  eslint.config.mjs, .husky/pre-commit,
-    (they only point to ① and ②)                             AGENTS.md block, .standardsrc.json …
-```
+---
 
-**① The npm package** (`@oneup4real/standards`)
+## 5. Quickstart: New Projects
 
-- **What it is:** a normal npm package, like `react`. It contains the command-line tool `oneup-standards` (wizard,
-  checks, hooks), the ESLint/TypeScript/Vitest/architecture configs, and the AI rules text.
-- **Where it comes from:** it is **not on the public npm registry**. npm installs it **straight from this GitHub repo**:
-  ```json
-  "devDependencies": { "@oneup4real/standards": "github:oneup4real/engineering-standards#semver:^1.0.0" }
-  ```
-  This means: "download the repo from GitHub, use the newest version tag that matches `^1.0.0`". No npm account or token
-  is needed, because the repo is public.
-- **Where it lands:** `node_modules/@oneup4real/standards/`. Its commands appear in `node_modules/.bin/`, so
-  `npx oneup-standards …` works. `package-lock.json` records the exact commit, so every machine and CI run uses the same
-  code.
-- **How it updates:** only when `package.json` changes, i.e. when you merge Dependabot's "bump @oneup4real/standards"
-  pull request.
-
-**② The reusable CI workflows**
-
-- **What they are:** GitHub Actions workflow files in *this* repo. They are **not** part of the npm package.
-- **How a project uses them:** the project's own `.github/workflows/ci.yml` is only a few lines. It says
-  `uses: oneup4real/engineering-standards/.github/workflows/ci-node.yml@v1`. On every run, **GitHub itself** fetches
-  that file from this repo and runs its steps inside the project's CI. Those steps then call the package from ① (which
-  `npm ci` installed).
-- **How they update:** `@v1` is a **tag that moves** to the latest 1.x release. So CI fixes reach every project
-  immediately, without a pull request. (Projects that chose "never update" point to a fixed tag such as `@v1.0.1`.)
-
-**③ The files the wizard writes** (once)
-
-| File in your project | Content | Points to |
-|---|---|---|
-| `eslint.config.mjs` | 3 lines: "use the shared rules" | ① `eslint/nextjs.js` |
-| `tsconfig.json` (you add `"extends"`) | "use the strict settings" | ① `tsconfig/nextjs.json` |
-| `.dependency-cruiser.cjs` | "use the layer rules" | ① `depcruise/layered.cjs` |
-| `vitest.config.ts` | "use the test preset" | ① `vitest/index.js` |
-| `tests/arch/standards.test.ts` | your guard names and folders | ① `arch/suite.js` |
-| `.husky/pre-commit`, `.husky/pre-push` | one line: `npx --no-install oneup-standards hook …` | ① the CLI |
-| `.github/workflows/ci.yml` | "run the shared pipeline" | ② |
-| `.github/dependabot.yml` | weekly update PRs | keeps ① current |
-| `AGENTS.md` (+ `CLAUDE.md`, `GEMINI.md`) | the shared AI rules, between markers | copied from ① (`sync-agents` refreshes it) |
-| `.standardsrc.json` | project settings (bundle markers, update mode) | read by ① |
-| `arch-allowlist.json`, `arch-action-gaps.json`, `.dependency-cruiser-known-violations.json` | the ratchets (existing problems) | read by ① |
-
-Because these files only *point* to the package, a rule change needs no edits in the project: the next package
-version changes the behaviour.
-
-### 1.2 What actually runs, step by step
-
-| You do… | Technically this happens |
-|---|---|
-| `npm install --save-dev github:…` | npm clones this repo at the matching tag into `node_modules`, links `oneup-standards` into `node_modules/.bin` |
-| `npx oneup-standards init` | Node runs `bin/oneup-standards.js` → the wizard detects your project, asks, writes the files from ③ |
-| `npm install` (any later time) | npm runs your `prepare` script → `husky` activates the hooks in `.husky/` |
-| `git commit` | git runs `.husky/pre-commit` → `oneup-standards hook pre-commit` → forbidden-file check, gitleaks, lint-staged |
-| `git push` | `.husky/pre-push` → TypeScript check, tests |
-| open a pull request | GitHub runs your `ci.yml` → fetches `ci-node.yml@v1` and `security.yml@v1` from this repo → they run `npm ci`, then lint, tests with coverage, TDD checks, architecture rules, build, bundle check, secret and code scans |
-| a new standards version is released | Dependabot changes the one line in `package.json` in a PR → that PR's CI shows if the project still passes |
-
-### 1.3 Words used in this README
-
-| Word | Meaning |
-|---|---|
-| **npm package** | A folder of code with a `package.json`, installed into `node_modules`. Here: `@oneup4real/standards`. |
-| **git dependency** | An npm package installed from a git repo instead of the npm registry (`github:owner/repo#…`). |
-| **tag / version** | A named point in this repo's history (`v1.0.1`). `v1` is a moving tag = "latest 1.x". |
-| **CLI** | The command-line tool `oneup-standards` inside the package. |
-| **wizard** | `oneup-standards init`: the interactive setup command. |
-| **hook** | A script git runs automatically before a commit or push. Managed by the tool *husky*. |
-| **reusable workflow** | A GitHub Actions pipeline in one repo that other repos call with `uses:`. |
-| **Dependabot** | GitHub's bot that opens pull requests to update dependencies. |
-| **ratchet / baseline** | A file listing today's known problems. Checks ignore those but fail on new ones; the list may only shrink. |
-| **skill** | Step-by-step instructions an AI tool loads for a type of task (e.g. Superpowers `test-driven-development`). There is no skill *required* to use this repo: the wizard is a normal command anyone can run. |
-
-## 2. Quick start: new project
+Create your project, initialize git, and run the wizard:
 
 ```bash
-npx create-next-app@latest my-app      # or create your project any other way
+npx create-next-app@latest my-app
 cd my-app
 git init
 npm install --save-dev github:oneup4real/engineering-standards#semver:^1.0.0
-npx oneup-standards init               # the wizard: explains each step and asks
-```
-
-Then follow [section 4](#4-make-the-checks-mandatory-on-github).
-
-## 3. Quick start: existing project
-
-Run these inside the project folder, one after the other.
-
-**Step 1: add the standards package**
-```bash
-npm install --save-dev github:oneup4real/engineering-standards#semver:^1.0.0
-```
-✔ Expected: `added … packages`. `package.json` now lists `@oneup4real/standards`.
-
-**Step 2: run the wizard**
-```bash
 npx oneup-standards init
 ```
-It asks up to 8 short questions and explains each one. Pressing Enter picks the recommended answer.
-Your existing files are **never silently replaced**:
 
-| You already have… | The wizard… |
-|---|---|
-| `eslint.config.mjs` | asks: **merge** (keeps yours as `eslint.config.local.mjs`), replace, or skip |
-| `.github/workflows/ci.yml` | asks: replace or keep |
-| `AGENTS.md` | adds the shared rules as a marked block at the end; your text stays byte for byte |
-| `CLAUDE.md` with `@AGENTS.md` | leaves it alone |
-| a PR template, `tests/arch/…`, a test script | keeps them |
+The interactive wizard asks 8 clear questions, selects recommended Secure SDLC settings, writes configs, and installs hooks. (Pass `--yes` to accept all recommended defaults non-interactively).
 
-✔ Expected at the end: a **Summary** table listing every file as `created`, `merged`, `skipped` or `updated`.
+---
 
-**Step 3: install gitleaks** (a secret scanner; the commit hook refuses to commit without it)
+## 6. Quickstart: Existing Projects
+
+You can bring legacy codebases under standards governance without turning your entire CI pipeline red on day one:
+
 ```bash
-brew install gitleaks          # Windows: winget install gitleaks
-```
+# Step 1: Install standards package directly from GitHub
+npm install --save-dev github:oneup4real/engineering-standards#semver:^1.0.0
 
-**Step 4: tell the bundle check what must never reach the browser**
+# Step 2: Run interactive wizard (merges configs, never blindly overwrites)
+npx oneup-standards init
 
-Open `.standardsrc.json` and list strings that only appear in confidential data, e.g. internal IDs:
-```json
-{
-  "bundleForbiddenMarkers": ["CUST-", "INTERNAL-REF-"],
-  "bundleDir": ".next/static",
-  "updateMode": "review",
-  "checkFiles": { "ignore": ["templates/*.docx", "docs/**/*.pdf"] }
-}
-```
+# Step 3: Install secret scanner
+brew install gitleaks     # Windows: winget install gitleaks
 
-Then switch the check on in `.github/workflows/ci.yml`: `bundle-check: true`. (The wizard does both if you enter
-markers when it asks.)
-
-**Step 5: record the problems that already exist** (the wizard already did this if you answered yes)
-```bash
+# Step 4: Record existing architecture violations (The Ratchet)
 npx oneup-standards baseline
-```
-This writes `.dependency-cruiser-known-violations.json`. **From now on only new violations fail.** Fix old ones
-over time; the file should only ever shrink.
 
-**Step 6: adjust `tests/arch/standards.test.ts`**
+# Step 5: Configure sensitive markers in .standardsrc.json
+# Add prefixes like "CUST-" or "INTERNAL-" that must never appear in client JS bundles
 
-Set the names of your auth guard functions (e.g. `requireAuth|requireRole`) and your folders.
-
-**Step 6b (optional): strict TypeScript settings**
-
-The wizard does not touch `tsconfig.json`, because stricter settings can turn existing code red. When you are ready,
-add `"extends": "@oneup4real/standards/tsconfig/nextjs.json"` at the top of `tsconfig.json`, run `npx tsc --noEmit` and
-fix what it reports.
-
-**Step 7: commit and push**
-```bash
+# Step 6: Commit and push
 git add -A
 git commit -m "chore: adopt engineering-standards"
 git push
 ```
-✔ Expected: the pre-commit hook prints its checks, and the push starts the **CI** and **security** jobs on GitHub.
 
-Then continue with section 4.
+From this point forward, **only new violations fail**. Existing legacy violations are frozen in `.dependency-cruiser-known-violations.json` and can be resolved incrementally over time.
 
-## 4. Make the checks mandatory on GitHub
+---
 
-Without this, a red check is only a warning and anyone can still merge.
+## 7. Fleet Anti-Drift: Doctor & Upgrade
 
-**Branch ruleset:** repository → **Settings → Rules → Rulesets → New branch ruleset**
-- Target: default branch
-- ✅ Restrict deletions · ✅ Block force pushes · ✅ Require a pull request before merging
-- ✅ Require status checks to pass: `ci / ci`, `security / gitleaks`, `security / audit`
-  (plus `security / semgrep` or `security / codeql`, whichever you use)
+As `@oneup4real/standards` evolves, how do you prevent older projects from becoming out-of-date?
 
-**Secret scanning:** **Settings → Code security** → enable *Secret scanning* and *Push protection*.
+### Diagnose with `doctor`
 
-> **Private repositories on a free personal account:** rulesets, secret scanning and CodeQL need **GitHub Pro**
-> (≈ $4/month) or Advanced Security. Without it the local hooks and CI still run, and they still fail
-> visibly, but GitHub will not *block* the merge. That is why the wizard defaults to **Semgrep** (free) instead of CodeQL.
+Run `doctor` to inspect your repository's files, git hooks, AI agent blocks, and environment readiness:
 
-With the GitHub CLI installed (`brew install gh`, then `gh auth login`), the wizard can create the ruleset for you.
-
-## 5. What happens when
-
-| When | What runs | Stops… |
-|---|---|---|
-| `git commit` | forbidden files · gitleaks · ESLint on changed files | documents, `.env` files, keys, secrets, lint errors |
-| `git push` | TypeScript check · unit tests | type errors, failing tests |
-| Pull request (CI) | forbidden files · ESLint (warnings fail too) · TypeScript · tests **with coverage** · **tests-changed check** · **changed-line coverage ≥ 80%** · architecture rules · rules tests (optional) · build · bundle check | everything above, plus code without tests, layer violations and confidential data in the browser bundle |
-| Pull request (security) | gitleaks (full history) · npm audit · Semgrep or CodeQL · dependency review | secrets, vulnerable dependencies, insecure code patterns |
-| Every week | Dependabot | outdated or vulnerable dependencies, new rule versions |
-
-## 6. A check failed. What now?
-
-| Message | Meaning | Fix |
-|---|---|---|
-| `These files must not be committed` | a `.docx/.xlsx/.pdf`, `.env` or key file is staged | `git restore --staged <file>`; store it outside the repo (SharePoint, secret manager) |
-| `gitleaks found a possible secret` | a password/API key is in your changes | remove it; if it was real, **rotate it** (it may already be in history) |
-| `gitleaks is not installed` | the secret scanner is missing | `brew install gitleaks` |
-| `UI code must not write to the database` | `setDoc/addDoc/…` in `src/app`, `components`, `hooks` or `context` | move the write into a server action → service |
-| `Seed/fixture data must not be imported` | test/seed data is imported by app code and would ship to browsers | load it only in scripts or tests |
-| `no-presentation-to-adapters` / `…-to-services` | UI imports server code directly | call a server action instead |
-| `domain-is-pure` | `src/domain` imports framework, DB or UI code | move that code out of the domain |
-| `exported action "x" has no guard call` | a server action doesn't check who is calling | call your guard (`requireAuth()`…) first, or mark it `// @public-action: <reason>` and rate-limit it |
-| `missing import 'server-only'` | a `src/server` file could end up in the browser | add `import 'server-only';` as the first line |
-| `direct call(s) … allowed N` | new direct DB writes outside server code | move them behind a server action |
-| `shrink the entry in arch-allowlist.json` | you removed old writes, good! | lower the number in the file (the ratchet only goes down) |
-| `Confidential data found in the client bundle` | a marker from `.standardsrc.json` is in built JS | find the `src/` import that pulls that data in and move it server-side |
-| `Build directory … does not exist` | bundle check ran before the build | run `npm run build` first |
-| `Source code changed, but no test file changed` | the PR changes code in `src/` (or `app/`, `lib/` …) without touching any test | write the test (first!). Only if truly no test is needed: label the PR `no-tests-needed` and explain why |
-| `Changed-line coverage … is below 80%` | tests don't run the lines you changed | add tests for the listed lines (`file: 12, 15-18`) |
-| `Coverage for lines (…%) does not meet … threshold` | `src/domain` is below 90% covered | add unit tests for the pure domain logic |
-
-**Never** "fix" a check by disabling it, adding an ignore comment, growing a baseline or using `git commit --no-verify`.
-
-## 7. Changing the rules (and how projects get them)
-
-1. Change the rule here, with a test (`npm test`), and update `CHANGELOG.md`.
-2. Release a version:
-   ```bash
-   npm version minor           # e.g. 1.0.0 → 1.1.0 (use "major" for changes that may break projects)
-   git push --follow-tags
-   git tag -f v1 && git push -f origin v1   # moves the v1 pointer used by the CI workflows
-   ```
-3. Dependabot opens "bump @oneup4real/standards to 1.1.0" in every project, and each project's CI shows whether it
-   still passes. Merge it (or let it auto-merge, if the project chose `updateMode: auto`).
-
-## 8. Improving the standards from another project ("harvest")
-
-When a project has a good security or architecture practice:
-
-1. Check it is useful for **every** project (otherwise keep it local).
-2. Make it generic: no project names, customer data or hard-coded paths; turn values into options.
-3. Add it here with tests, then release a new version (section 7).
-
-**Never copy confidential details into this repo.** It is public.
-
-## 9. AI tools and skills
-
-**Which file each tool reads:**
-
-| Tool | Reads | Set up by |
-|---|---|---|
-| Codex, Cursor, Copilot, Jules, Antigravity | `AGENTS.md` | wizard / `sync-agents` |
-| Claude Code | `CLAUDE.md` → `@AGENTS.md` | wizard / `sync-agents` |
-| Gemini CLI | `GEMINI.md` → `@AGENTS.md` | wizard / `sync-agents` |
-| All tools, every project (global) | `~/.agents/AGENTS.md` (+ pointers in `~/.claude`, `~/.gemini`, copy in `~/.codex`) | `npx oneup-standards sync-agents --global` |
-
-The shared rules live in [`agents/AGENTS.global.md`](agents/AGENTS.global.md). In a project they sit between
-`<!-- BEGIN oneup4real/engineering-standards … -->` and `<!-- END … -->`. Don't edit inside the markers; the next
-sync overwrites it. Write project rules outside the block.
-
-### Subagent Dual-Control Workflow & Superpowers
-
-The setup wizard automatically checks if Claude Code is installed and offers to install the **Superpowers** plugin (`superpowers@superpowers-marketplace`).
-
-Superpowers powers the **Subagent Dual-Control Protocol** specified in `AGENTS.global.md`:
-1. **Planning:** Breaks tasks into atomized steps with test and acceptance criteria (`writing-plans`).
-2. **Implementer Subagents:** Dispatches dedicated, isolated implementers per task (`executing-plans` / `subagent-driven-development`).
-3. **Reviewer Subagents (Dual Control):** Spawns an independent reviewer after each step to verify code, types, architecture, and tests before moving forward.
-
-**Installation & Manual Setup:**
 ```bash
-claude plugin install superpowers@superpowers-marketplace
+npx oneup-standards doctor
 ```
 
-**Superpowers skills** (process discipline, installed as a Claude Code plugin: `superpowers@superpowers-marketplace`):
+Output:
+```
+Standards drift / issues detected:
+  outdated     .github/pull_request_template.md    older version that was never edited; `upgrade` replaces it
+  missing      .lintstagedrc.json                  missing; `upgrade` adds it
+  missing      package.json                        missing scripts: check:arch; `upgrade` adds them
 
-| Situation | Skill |
-|---|---|
-| New feature or behaviour change: clarify before coding | `brainstorming` |
-| Multi-step task: plan files, signatures and tests first | `writing-plans` |
-| Carry out a plan task by task | `executing-plans` / `subagent-driven-development` |
-| Any code: test first, see it fail, then implement | `test-driven-development` |
-| Bug or failing test: prove the root cause first | `systematic-debugging` |
-| Before saying "done": run the checks, show the output | `verification-before-completion` |
-| Review before merge | `requesting-code-review` / `receiving-code-review` |
+Run `npx oneup-standards upgrade` to synchronize configuration files.
+```
 
-Tools without skill support get the short version of these steps from `AGENTS.md` section 1.
+In CI, `oneup-standards doctor --warn-only` runs automatically on pull requests to highlight drift without failing the build.
 
-### How test-driven development (TDD) is enforced
+### Safe Synchronization with `upgrade`
 
-| Part of TDD | Enforced by |
-|---|---|
-| Tests exist and pass | pre-push hook and CI (`vitest run --coverage`) |
-| New code comes with tests | CI `check-tests-changed`: a PR that changes source code without any test change fails |
-| The new code is actually tested | CI `check-diff-coverage`: at least 80% of the **changed lines** must be run by tests. Works in old projects with low overall coverage too |
-| Core logic is thoroughly tested | Vitest preset: `src/domain` needs ≥ 90% lines/functions, ≥ 80% branches |
-| The test was written **first** and seen failing | cannot be checked by a machine: AGENTS.md rule, Superpowers `test-driven-development`, PR checkbox |
+The `upgrade` command automatically updates outdated templates, creates missing files, appends missing hook lines, and refreshes the managed AI rules block in `AGENTS.md`:
 
-Escape hatch: label a pull request `no-tests-needed` (e.g. a pure copy change) and say why. AI agents are told never to
-add that label themselves.
+```bash
+# Preview changes without modifying disk:
+npx oneup-standards upgrade --dry-run
 
-**Remember:** instructions are the soft layer. The hooks and CI are what actually hold the line, whichever AI (or
-human) wrote the code.
+# Apply safe upgrades:
+npx oneup-standards upgrade
 
-## 10. All commands
+# Force replacement of customized files (creates .bak backups):
+npx oneup-standards upgrade --force
+```
 
-| Command | What it does |
-|---|---|
-| `npx oneup-standards init` | setup wizard (`--yes` = accept all recommended answers) |
-| `npx oneup-standards baseline` | record current architecture violations (only new ones fail afterwards) |
-| `npx oneup-standards sync-agents` | refresh the shared rules in `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` |
-| `npx oneup-standards sync-agents --global` | same, for your personal global AI instructions |
-| `npx oneup-standards check-files [paths]` | forbidden-file check (default: staged files) |
-| `npx oneup-standards check-bundle [--dir d]` | scan built client JS for confidential markers |
-| `npx oneup-standards check-tests-changed --base origin/main` | fail if source changed without test changes |
-| `npx oneup-standards check-diff-coverage --base origin/main [--min 80]` | fail if changed lines are under-tested (needs `coverage/lcov.info`) |
-| `npx oneup-standards hook pre-commit` / `pre-push` | what the git hooks run |
+> **Safety Guarantee:** `upgrade` uses cryptographic SHA-256 fingerprints stored in `.standardsrc.json`. It will **never** overwrite a template file that you customized locally, unless you explicitly pass `--force`.
 
-**Building blocks you can import:**
+---
 
-| Import | Use |
-|---|---|
-| `@oneup4real/standards/eslint/nextjs` · `/eslint/base` | ESLint presets |
-| `@oneup4real/standards/tsconfig/nextjs.json` · `/tsconfig/base.json` | `"extends"` in `tsconfig.json` |
-| `@oneup4real/standards/depcruise/layered` | architecture rules for dependency-cruiser |
-| `@oneup4real/standards/vitest` | `defineStandardsConfig()` for `vitest.config.ts` |
-| `@oneup4real/standards/arch/suite` | `defineArchSuite()`: server-only, action guards, write ratchet, sets in sync |
-| `@oneup4real/standards/firebase-testing` | `assertEmulator`, `createRulesEnv`, `nobody`, `anon`, `withRoles`, `seed` |
-| `@oneup4real/standards/next/headers` | `securityHeaders()` for `next.config`. Firebase apps: `securityHeaders({ firebase: true })` |
+## 8. Make the Checks Mandatory on GitHub
 
-More detail: [docs/architecture.md](docs/architecture.md) · [docs/adoption.md](docs/adoption.md)
+Local hooks catch mistakes on your machine, but GitHub branch protection prevents anyone (human or agent) from bypassing them with `--no-verify`.
 
-## 11. FAQ
+### 1. Branch Ruleset (Repository Settings → Rules → Rulesets)
+Create a ruleset targeting the default branch:
+- ✅ **Restrict deletions**
+- ✅ **Block force pushes**
+- ✅ **Require a pull request before merging**
+- ✅ **Require status checks to pass:**
+  - `ci / ci`
+  - `security / gitleaks`
+  - `security / audit`
+  - `security / semgrep` (or `security / codeql`)
 
-**Is this an npm package?** Yes: `@oneup4real/standards`. It is installed from this GitHub repo, not from the npm
-registry (see [1.1](#11-under-the-hood-the-three-delivery-channels)).
+### 2. Code Security (Repository Settings → Code security)
+- Enable **Secret scanning** and **Push protection**.
 
-**Is "connecting a project" a skill I need?** No. Connecting = installing the package and running `npx oneup-standards init`.
-You can do it yourself, or ask any AI assistant to run those two commands. (A skill that wraps them may come later.)
+*(If you have the GitHub CLI installed, `npx oneup-standards init` can automatically create this ruleset for you).*
 
-**Does connecting a project change anything in this repo?** No. Projects only read from here.
+---
 
-**Can a project stay on an old version?** Yes. Don't merge the update PR, or choose "Never update" in the wizard.
-With "review" or "auto", the CI workflows follow the `v1` tag, so CI fixes arrive without a PR (only compatible
-changes are ever released under `v1`). "Never update" pins CI to the exact release (e.g. `@v1.0.0`) as well.
+## 9. What Happens When (Pipeline Breakdown)
 
-**The wizard replaced something I needed.** It only replaces files after you answered "replace". Your previous ESLint
-config is kept as `eslint.config.local.mjs`. Everything is in git: `git diff` shows the changes, and `git checkout -- <file>`
-restores a file.
+| Event | Execution Target | Checks Executed | Fail Conditions |
+|---|---|---|---|
+| `git commit` | Local Machine (`.husky/pre-commit`) | `check-files`, `gitleaks protect`, `lint-staged` | Staged keys/env files, exposed credentials, lint errors. |
+| `git push` | Local Machine (`.husky/pre-push`) | `tsc --noEmit`, `npm test` | TypeScript type errors, failing unit tests. |
+| **Pull Request (CI Pipeline)** | GitHub Actions (`ci-node.yml`) | • Standards doctor drift scan<br>• Forbidden file audit<br>• ESLint (`--max-warnings=0`)<br>• TypeScript compile<br>• Vitest with coverage<br>• `check-tests-changed` (TDD)<br>• `check-diff-coverage` (≥80%)<br>• dependency-cruiser layers<br>• `arch/suite.js` (action guards & write ratchets)<br>• Production build<br>• `check-bundle` confidential scanner | Any warning or error, missing tests on source edits, diff coverage < 80%, layer violations, unguarded server actions, confidential bundle leaks. |
+| **Pull Request (Security)** | GitHub Actions (`security.yml`) | • Pinned Gitleaks full history audit<br>• `npm audit`<br>• Semgrep SAST / CodeQL<br>• Dependency review | Leaked secrets anywhere in git history, high/critical CVEs, insecure AST patterns. |
+| **Weekly** | Dependabot | Weekly check for new `@oneup4real/standards` releases | Outdated central standards package. |
 
-**CI says `npx oneup-standards: not found`.** Run `npm install` and commit `package-lock.json`.
+---
 
-**My project doesn't use Next.js.** Use `eslint/base` and `tsconfig/base.json`. The rest works the same.
+## 10. A Check Failed. What Now?
 
-**Can I run the wizard again?** Yes. It detects what is already there and only fills the gaps.
+| Failure Message / Symptom | Root Cause | Proper Remediation |
+|---|---|---|
+| `These files must not be committed` | A `.docx`, `.xlsx`, `.pdf`, `.env`, or credential file was staged. | Run `git restore --staged <file>`. Store documents in secure document management (SharePoint/Drive) and secrets in Secret Manager. |
+| `gitleaks found a possible secret` | Secret or API key detected in staged diff or commit history. | Remove from file. If it was ever committed to history, **revoke and rotate the credential immediately**. |
+| `UI code must not write to the database` | Direct Firestore/DB mutation (`setDoc`, `addDoc`) inside UI component. | Move the database mutation behind a Server Action (`src/app/actions`) and Service (`src/server/services`). |
+| `exported action "x" has no guard call` | Exported `'use server'` function lacks an authentication guard. | Invoke `await requireAuth()` or `await requireRole('admin')` at the beginning of the function, or mark explicitly with `// @public-action: <reason>`. |
+| `missing import 'server-only'` | Server file can be leaked into browser bundle. | Add `import 'server-only';` as the first line of the file. |
+| `Source code changed, but no test file changed` | Modified application logic without adding or updating tests. | Write the failing test first. If truly non-functional (e.g. pure docs/copy change), add the PR label `no-tests-needed`. |
+| `Changed-line coverage ... is below 80%` | Newly added lines of code are not exercised by tests. | Add test cases specifically covering the uncovered lines shown in the CI terminal output. |
+| `Confidential data found in the client bundle` | Sensitive marker (e.g. `CUST-`) compiled into `.next/static`. | Remove client import of server-side data models; pass only sanitized view models across the wire. |
+| `shrink the entry in arch-allowlist.json` | You eliminated legacy direct DB writes! | Decrease the count in `arch-allowlist.json`. The ratchet only allows downward movement. |
+
+> **Critical Rule:** Never bypass checks using `git commit --no-verify`, disable rules in ESLint, or inflate ratchet numbers. Fix the underlying code.
+
+---
+
+## 11. CLI Commands Reference
+
+All commands are available via `npx oneup-standards <command>`:
+
+| Command | Arguments / Flags | Description |
+|---|---|---|
+| `init` | `[--yes]` | Interactive setup wizard for new or existing projects (`--yes` accepts recommended answers). |
+| `doctor` | `[--warn-only]` | Diagnoses configuration drift, missing hooks, outdated templates, and environment status. |
+| `upgrade` | `[--force] [--dry-run]` | Safely synchronizes template files, hooks, and AI rules. Uses `--force` to replace customized files. |
+| `baseline` | none | Generates `.dependency-cruiser-known-violations.json` from current code to ratchet existing architectural violations. |
+| `sync-agents` | `[--global]` | Refreshes managed shared rules in `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` (`--global` updates `~/.agents/AGENTS.md`). |
+| `check-files` | `[paths...]` | Fails if specified paths (default: staged files) contain office docs, keys, or `.env` files. |
+| `check-bundle` | `[--dir <path>]` | Scans production JavaScript bundles for confidential markers configured in `.standardsrc.json`. |
+| `check-tests-changed` | `--base <git-ref>` | Enforces TDD by failing if source code changed without corresponding test modifications. |
+| `check-diff-coverage` | `--base <ref> [--min 80]` | Fails if newly added or modified lines have less than the required test coverage percentage. |
+| `hook` | `pre-commit \| pre-push` | Executes git hook sequences orchestrated by Husky. |
+
+---
+
+## 12. Importable Building Blocks
+
+Projects consuming `@oneup4real/standards` can import standard presets directly:
+
+| Import Path | Type | Description |
+|---|---|---|
+| `@oneup4real/standards/eslint/nextjs` | ESLint Config | Next.js flat ESLint preset with security rules, strictness, and React hooks validation. |
+| `@oneup4real/standards/eslint/base` | ESLint Config | Framework-agnostic base ESLint configuration. |
+| `@oneup4real/standards/tsconfig/nextjs.json` | TSConfig | Strict TypeScript compiler settings for Next.js applications. |
+| `@oneup4real/standards/tsconfig/base.json` | TSConfig | Strict base TypeScript settings (`noImplicitAny`, `strictNullChecks`). |
+| `@oneup4real/standards/depcruise/layered` | Dependency Cruiser | Clean Architecture layer dependency validation rules. |
+| `@oneup4real/standards/vitest` | Vitest Config | Preset configuring coverage thresholds (≥90% domain coverage) and reporting. |
+| `@oneup4real/standards/arch/suite` | Arch Test Kit | `defineArchSuite()`: Automates checks for `server-only`, Action guards, and write ratchets. |
+| `@oneup4real/standards/firebase-testing` | Test Helpers | Firebase emulator testing utilities (`assertEmulator`, `createRulesEnv`, `withRoles`). |
+| `@oneup4real/standards/next/headers` | Next Config | Production security headers (`securityHeaders({ firebase: true })`) including CSP, HSTS, and XFO. |
+
+---
+
+## 13. Appendices (Deep Technical Details)
+
+### Appendix A: The Three Delivery Channels
+
+`@oneup4real/standards` does not require publishing to the public npm registry or managing private registry tokens:
+
+```
+  engineering-standards (GitHub)                        your project
+  ─────────────────────────────                        ────────────────────────────────────────────
+  ① npm package  @oneup4real/standards   ── npm install ──▶  node_modules/@oneup4real/standards/
+     (CLI, configs, checks, AST scanners)                    + one line in package.json
+                                                              + exact commit pinned in package-lock.json
+
+  ② reusable CI workflows                ◀── fetched by GitHub ── .github/workflows/ci.yml
+     .github/workflows/ci-node.yml             on every run        ("uses: …/ci-node.yml@v1")
+     .github/workflows/security.yml
+
+  ③ small files written ONCE by wizard  ─────────────▶  eslint.config.mjs, .husky/pre-commit,
+     (managed via doctor & upgrade)                          AGENTS.md block, .standardsrc.json …
+```
+
+1. **Git Dependency:** Installed via `"@oneup4real/standards": "github:oneup4real/engineering-standards#semver:^1.0.0"`. npm downloads the tarball directly from GitHub matching the semver range. `package-lock.json` pins the immutable git commit SHA.
+2. **Reusable Workflows:** Reference `uses: oneup4real/engineering-standards/.github/workflows/ci-node.yml@v1`. The `@v1` tag points to the latest stable 1.x release, allowing immediate distribution of CI security patches without requiring PRs in individual repos.
+3. **Managed Consumer Pointers:** Tiny files pointing back to ① and ②.
+
+---
+
+### Appendix B: Cryptographic Anti-Drift Fingerprinting
+
+To solve configuration drift without destroying developer customizations, `lib/doctor.js` and `lib/templates.js` implement SHA-256 fingerprint tracking:
+
+```mermaid
+flowchart TD
+    File[Target File in Project] --> Read[Read & Normalize LF]
+    Read --> Hash[Compute SHA-256 Hash]
+    
+    Hash --> CompareTemplate{Equals Current Template?}
+    CompareTemplate -->|Yes| OK[Status: OK]
+    CompareTemplate -->|No| CompareRecorded{Equals Recorded Hash in .standardsrc.json?}
+    
+    CompareRecorded -->|Yes| Outdated[Status: OUTDATED\nFile was never touched by user;\nsafe to auto-replace on upgrade]
+    CompareRecorded -->|No| Customized[Status: CUSTOMIZED\nUser made local edits;\nDo NOT overwrite unless --force]
+```
+
+- When the wizard writes a template, it records `managed[relFile] = "sha256:..."` in `.standardsrc.json`.
+- `upgrade` replaces `outdated` files automatically.
+- `customized` files are protected; running `upgrade --force` replaces them but preserves an exact backup copy as `<file>.bak`.
+
+---
+
+### Appendix C: Monotonic Ratchets for Legacy Migration
+
+Adopting strict architectural standards in large, pre-existing codebases is often blocked by thousands of pre-existing violations. The Ratchet pattern solves this:
+
+1. **Architecture Violations (`.dependency-cruiser-known-violations.json`):**
+   Generated by `npx oneup-standards baseline`. CI runs `depcruise --ignore-known`. If new illegal imports are introduced, CI fails. As old imports are deleted, the baseline file shrinks.
+2. **Direct DB Write Ratchet (`arch-allowlist.json`):**
+   Tracks allowed direct DB writes per file. If a developer attempts a new direct write outside of a service, the count exceeds the allowlist and CI fails:
+   $$\text{violations}(file) \le \text{allowlist}(file)$$
+   If an engineer refactors a file and reduces writes from 3 to 1, the test suite asserts:
+   $$\text{violations}(file) < \text{allowlist}(file) \implies \text{FAIL: Shrink entry in arch-allowlist.json}$$
+   The ratchet is mathematically monotonic: it can only ever decrease.
+
+---
+
+### Appendix D: TypeScript AST Guard Inspection
+
+`arch/index.js` employs TypeScript's native Compiler API (`ts.createSourceFile`) to inspect exported functions in `'use server'` files:
+
+1. It parses every exported arrow function, function declaration, and variable statement.
+2. It walks the Abstract Syntax Tree (AST) down to find call expressions.
+3. It validates that the first executable statements invoke an authorization guard matching the configured pattern (e.g. `/^(requireAuth|requireRole|assertUser)/`).
+4. If an action is intentionally unauthenticated, it requires an explicit leading comment matching `// @public-action: <explanation>`, ensuring that every unauthenticated boundary is documented and auditable.
+
+---
+
+### Appendix E: Supply Chain Security & Action Pinning
+
+In compliance with enterprise Secure SDLC standards (ISO 27001, SOC 2, SLSA):
+- **Immutable Action Pinning:** All third-party GitHub Actions referenced across reusable workflows are pinned to full 40-character commit SHAs, never mutable branch or version tags:
+  ```yaml
+  # Vulnerable:
+  uses: actions/setup-node@v4
+  # Enforced by engineering-standards:
+  uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+  ```
+- **Pinned Secret Scanner Binary:** Rather than using third-party composite actions that may execute untrusted node dependencies, `security.yml` downloads the official `gitleaks` binary directly from GitHub releases, validates its cryptographic SHA-256 checksum, and executes it in isolation.

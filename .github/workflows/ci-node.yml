@@ -73,6 +73,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Standards drift check
+        run: npx --no-install oneup-standards doctor --warn-only || echo "::warning::oneup-standards doctor not available in this package version"
+
       - name: Forbidden files (documents, env files, keys)
         run: git ls-files -z | xargs -0 npx --no-install oneup-standards check-files
 

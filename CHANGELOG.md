@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0] - 2026-10-03
+
+### Added
+- Fleet Anti-Drift Architecture: `oneup-standards doctor` command to diagnose configuration drift and environment readiness.
+- `oneup-standards upgrade` command: synchronizes managed templates, hooks, `.gitignore` rules, and AI agent instructions without overwriting custom edits (using SHA-256 fingerprint tracking).
+- Reusable CI workflow integration: `ci-node.yml` automatically runs `doctor --warn-only` on PRs to visibly alert teams of configuration drift.
+- Comprehensive Secure SDLC documentation in README with risk mitigation matrix, agent dual-control workflow, architecture diagrams, and technical appendices.
+
 ## [1.2.0] - 2026-09-30
 
 ### Added
