@@ -331,25 +331,28 @@ You can bring legacy codebases under standards governance without turning your e
 # Step 1: Install standards package directly from GitHub
 npm install --save-dev github:oneup4real/engineering-standards#semver:^1.0.0
 
-# Step 2: Run interactive wizard (merges configs, never blindly overwrites)
+# Step 2: Run interactive wizard
 npx oneup-standards init
+```
 
-# Step 3: Install secret scanner
+The wizard guides you through setup and automates the migration:
+- **Merges ESLint & TypeScript rules** without overwriting your custom rules.
+- **Freezes Legacy Architecture Violations:** Automatically creates `.dependency-cruiser-known-violations.json` so current code passes CI and only *new* violations fail.
+- **Prompts for Confidential Markers:** Configures strings (e.g. `CUST-` or `INTERNAL-`) in `.standardsrc.json` that must never appear in client JS bundles.
+- **Installs Git Hooks:** Configures Husky pre-commit and pre-push verification.
+
+```bash
+# Step 3: Ensure secret scanner is installed on your machine
 brew install gitleaks     # Windows: winget install gitleaks
 
-# Step 4: Record existing architecture violations (The Ratchet)
-npx oneup-standards baseline
-
-# Step 5: Configure sensitive markers in .standardsrc.json
-# Add prefixes like "CUST-" or "INTERNAL-" that must never appear in client JS bundles
-
-# Step 6: Commit and push
+# Step 4: Review changes, commit, and push
 git add -A
 git commit -m "chore: adopt engineering-standards"
 git push
 ```
 
-From this point forward, **only new violations fail**. Existing legacy violations are frozen in `.dependency-cruiser-known-violations.json` and can be resolved incrementally over time.
+From this point forward, **only new violations fail**. Existing legacy violations can be resolved incrementally over time.
+
 
 ---
 
