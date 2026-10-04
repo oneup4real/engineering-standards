@@ -12,19 +12,20 @@ One source of truth for the rules every project must follow. Projects connect on
 
 ## Table of Contents
 
-1. [Secure SDLC Architecture & Flow](#1-secure-sdlc-architecture--flow)
-2. [Tools Used & Risk Mitigation Matrix](#2-tools-used--risk-mitigation-matrix)
-3. [Architectural Guardrails](#3-architectural-guardrails)
-4. [Subagent Dual-Control Protocol](#4-subagent-dual-control-protocol)
-5. [Quickstart: New Projects](#5-quickstart-new-projects)
-6. [Quickstart: Existing Projects](#6-quickstart-existing-projects)
-7. [Fleet Anti-Drift: Doctor & Upgrade](#7-fleet-anti-drift-doctor--upgrade)
-8. [Make the Checks Mandatory on GitHub](#8-make-the-checks-mandatory-on-github)
-9. [What Happens When (Pipeline Breakdown)](#9-what-happens-when-pipeline-breakdown)
-10. [A Check Failed. What Now?](#10-a-check-failed-what-now)
-11. [CLI Commands Reference](#11-cli-commands-reference)
-12. [Importable Building Blocks](#12-importable-building-blocks)
-13. [Appendices (Deep Technical Details)](#13-appendices-deep-technical-details)
+1. [Secure SDLC (SSDLC) Phase Mapping](#1-secure-sdlc-ssdlc-phase-mapping)
+2. [SSDLC Pipeline & Architecture Flow](#2-ssdlc-pipeline--architecture-flow)
+3. [Tools Used & Risk Mitigation Matrix](#3-tools-used--risk-mitigation-matrix)
+4. [Architectural Guardrails & Threat Boundaries](#4-architectural-guardrails--threat-boundaries)
+5. [Subagent Dual-Control Protocol](#5-subagent-dual-control-protocol)
+6. [Quickstart: New Projects](#6-quickstart-new-projects)
+7. [Quickstart: Existing Projects](#7-quickstart-existing-projects)
+8. [Fleet Anti-Drift: Doctor & Upgrade](#8-fleet-anti-drift-doctor--upgrade)
+9. [Make the Checks Mandatory on GitHub](#9-make-the-checks-mandatory-on-github)
+10. [What Happens When (Pipeline Breakdown)](#10-what-happens-when-pipeline-breakdown)
+11. [A Check Failed. What Now?](#11-a-check-failed-what-now)
+12. [CLI Commands Reference](#12-cli-commands-reference)
+13. [Importable Building Blocks](#13-importable-building-blocks)
+14. [Appendices (Deep Technical Details)](#14-appendices-deep-technical-details)
     - [Appendix A: The Three Delivery Channels](#appendix-a-the-three-delivery-channels)
     - [Appendix B: Cryptographic Anti-Drift Fingerprinting](#appendix-b-cryptographic-anti-drift-fingerprinting)
     - [Appendix C: Monotonic Ratchets for Legacy Migration](#appendix-c-monotonic-ratchets-for-legacy-migration)
@@ -33,14 +34,47 @@ One source of truth for the rules every project must follow. Projects connect on
 
 ---
 
-## 1. Secure SDLC Architecture & Flow
+## 1. Secure SDLC (SSDLC) Phase Mapping
+
+`@oneup4real/standards` aligns modern AI-assisted engineering with the classical **Secure Software Development Lifecycle (SSDLC)** (NIST SSDF SP 800-218, OWASP SAMM, Microsoft SDL):
+
+```mermaid
+graph LR
+    P1["1. Requirements & Threat Modeling"] --> P2["2. Secure Architecture & Design"]
+    P2 --> P3["3. Secure Coding & TDD (Shift-Left)"]
+    P3 --> P4["4. Automated Security Verification (CI)"]
+    P4 --> P5["5. Secure Release & Deployment"]
+    P5 --> P6["6. Operations & Fleet Governance"]
+    P6 -.->|Continuous Feedback / Harvest| P1
+```
+
+### Detailed Phase Breakdown
+
+| SSDLC Phase | Classical Activities (NIST / OWASP) | Threats & AI Failure Modes Mitigated | Enforcement Mechanism & Tools Used | Responsibility / Gate |
+|---|---|---|---|---|
+| **1. Requirements & Threat Modeling** | • Abuse case modeling<br>• Trust boundary definition<br>• Security requirements & compliance scope (GDPR/ISO 27001) | AI agents implementing features without considering auth boundaries, data privacy, or business logic abuse. | • `brainstorming` skill<br>• `writing-plans` (formal spec before code)<br>• Definition of Done (`AGENTS.global.md`) | **Human & AI Alignment**:<br>Human approves spec and acceptance criteria before implementation begins. |
+| **2. Secure Architecture & Design** | • Layered defense-in-depth<br>• Principle of Least Privilege<br>• Server-side token verification<br>• Zero-trust database design | Architecture erosion; UI components directly mutating databases; bypass of server-side authorization. | • `depcruise/layered.cjs` (Clean Architecture)<br>• Server action isolation (`src/server/actions`)<br>• Deny-by-default Firestore rules (`allow write: if false`) | **Architectural Rules**:<br>Machine-checked layer boundaries; domain layer remains pure. |
+| **3. Secure Coding & Shift-Left Dev** | • Test-Driven Development (TDD)<br>• Secret scanning on staged changes<br>• Static linting of security rules<br>• Strict typing & type safety | AI hallucinating code without tests; committing credentials, `.env` files, or internal PDFs; using `any` or `dangerouslySetInnerHTML`. | • **Husky hooks** (`pre-commit`, `pre-push`)<br>• **Gitleaks** (`gitleaks protect --staged`)<br>• `oneup-standards check-files`<br>• **ESLint Security Plugin** (`@oneup4real/standards/eslint/nextjs`)<br>• Strict TS (`tsconfig/nextjs.json`) | **Pre-Commit Gate**:<br>Local commit fails immediately if secrets, forbidden files, or lint errors are present. |
+| **4. Automated Security Verification (CI)** | • **SAST** (Static Application Security Testing)<br>• **SCA** (Software Composition Analysis)<br>• **AST Guard Inspection**<br>• **TDD & Diff Coverage**<br>• **Bundle Leak Detection**<br>• **Emulated Rules Testing** | Unguarded server endpoints; vulnerable dependencies; untested edge cases; sensitive markers in browser JavaScript. | • **SAST**: Semgrep / GitHub CodeQL<br>• **SCA**: `npm audit` + Dependabot<br>• **AST Security**: `arch/suite.js` (Action auth guards)<br>• **TDD Gates**: `check-tests-changed` & `check-diff-coverage >= 80%`<br>• **Bundle Audit**: `check-bundle`<br>• **Emulated Testing**: `@oneup4real/standards/firebase-testing` against local emulator | **Pull Request Gate**:<br>Automated reusable CI (`ci-node.yml`, `security.yml`). Unchecked code cannot merge. |
+| **5. Secure Release & Deployment** | • Branch protection<br>• Release gating & Four-Eyes principle<br>• Production security headers<br>• Blast radius containment | Unreviewed AI code pushed directly to production; missing HTTP defense headers; unintended rule deployment. | • GitHub Rulesets (block force push, require PRs & green checks)<br>• Next.js `securityHeaders` (CSP, HSTS, XFO)<br>• Human-only deployment rule for database security rules | **Release Gate**:<br>Human-in-the-loop review; status checks must pass; security rules deployed only by humans. |
+| **6. Operations & Fleet Governance** | • Anti-drift management<br>• Vulnerability patching<br>• Technical debt reduction (ratchets) | Repositories drifting from security standards; unpatched dependencies; growing legacy code debt. | • `oneup-standards doctor`<br>• `oneup-standards upgrade`<br>• Monotonic ratchets (`arch-allowlist.json`, `known-violations`)<br>• Weekly Dependabot updates & `standards-automerge` | **Continuous Monitoring**:<br>Ratchets can only shrink; PRs visibly flag configuration drift. |
+
+---
+
+## 2. SSDLC Pipeline & Architecture Flow
 
 The following diagram illustrates how changes travel from prompt to production across the multi-layered defense-in-depth pipeline:
 
 ```mermaid
 flowchart TD
-    subgraph S1["Phase 1: Agent & Developer Workstation"]
-        Agent[AI Agent / Developer] -->|1. Test-First TDD| Code[Code + Tests]
+    subgraph S1["Phase 1 & 2: Requirements & Threat Modeling"]
+        HumanLead[Human Lead / Product] -->|Define Goal| Spec[Spec & Plan\nwriting-plans]
+        Spec --> ThreatModel[Identify Trust Boundaries & Auth Requirements]
+    end
+
+    subgraph S2["Phase 3: Shift-Left Dev & Pre-Commit Gates"]
+        ThreatModel -->|Task Dispatch| Agent[AI Implementer Subagent]
+        Agent -->|1. Test-First TDD| Code[Code + Tests]
         Code -->|git commit| HookCommit[Husky Pre-Commit Hook]
         HookCommit -->|Check 1| ScanFiles[oneup-standards check-files\nBlock .env, keys, office docs]
         HookCommit -->|Check 2| GitleaksLocal[gitleaks protect --staged\nSecret Scan]
@@ -52,7 +86,7 @@ flowchart TD
         HookPush -->|Check 5| VitestLocal[npm test\nUnit Tests Pass]
     end
 
-    subgraph S2["Phase 2: Pull Request Gate (GitHub Actions Reusable CI)"]
+    subgraph S3["Phase 4: Automated CI Verification & Security Testing"]
         HookPush -->|Pass & Push| PR[Pull Request Opened]
         PR --> CI_Job[ci-node.yml @v1]
         PR --> Sec_Job[security.yml @v1]
@@ -66,40 +100,44 @@ flowchart TD
         CI_Job --> CI_Bundle[check-bundle\nScan built JS for confidential markers]
 
         Sec_Job --> Sec_Leaks[gitleaks --full-history\nFull repo scan]
-        Sec_Job --> Sec_Audit[npm audit\nDependency vulnerability scan]
-        Sec_Job --> Sec_SAST[Semgrep / CodeQL\nStatic Application Security Testing]
+        Sec_Job --> Sec_Audit[npm audit\nSCA dependency audit]
+        Sec_Job --> Sec_SAST[Semgrep / CodeQL\nSAST code scanning]
     end
 
-    subgraph S3["Phase 3: Fleet Governance & Auto-Updates"]
-        Central[oneup4real/engineering-standards] -->|Dependabot Bump PR| ConsumerRepo[Target Project]
-        ConsumerRepo -->|oneup-standards doctor| ReportDrift[Identify Outdated Configs]
-        ConsumerRepo -->|oneup-standards upgrade| AutoUpgrade[Upgrade Templates Safely via Hashes]
+    subgraph S4["Phase 5 & 6: Secure Release & Fleet Governance"]
+        CI_Job --> PR_Review[Independent Reviewer Subagent\n+ Human Approval]
+        Sec_Job --> PR_Review
+        PR_Review -->|Merge to main| Release[Production Release\nsecurityHeaders & Ruleset]
+        Release --> Central[Fleet Governance]
+        Central -->|oneup-standards doctor / upgrade| AntiDrift[Cryptographic Anti-Drift]
     end
 ```
 
 ---
 
-## 2. Tools Used & Risk Mitigation Matrix
+## 3. Tools Used & Risk Mitigation Matrix
 
 Every tool incorporated into `@oneup4real/standards` is targeted at specific real-world security vulnerabilities and common failure modes of AI coding agents:
 
-| Tool / Technology | Execution Point | Specific Threat / AI Failure Mode Prevented | Secure SDLC Impact |
+| Tool / Technology | SSDLC Phase | Specific Threat / AI Failure Mode Prevented | Secure SDLC Impact |
 |---|---|---|---|
-| **gitleaks** | Pre-commit & CI | AI accidentally commits API keys, Firebase service account credentials, or `.env` files into git history. | **Secrets & Credential Hygiene**: Halts commits locally; audits full git history in CI. |
-| **`check-files`** | Pre-commit & CI | AI commits internal documentation (`.docx`, `.pdf`, `.xlsx`), raw keys (`.pem`, `.key`), or local environments. | **Data Leakage & Asset Sprawl**: Rejects disallowed extensions before staging. |
-| **ESLint Security Plugin** | Pre-commit & CI | Direct client writes to DB (`setDoc`, `addDoc`), secret access in `NEXT_PUBLIC_*`, `any` type casts, `dangerouslySetInnerHTML`. | **Injection & Authorization Bypass**: Guarantees writes go through server actions; stops client data poisoning. |
-| **dependency-cruiser** | CI & Pre-push | UI directly importing server adapters/database modules; circular dependencies; domain layer corruption. | **Architectural Integrity**: Enforces strict boundaries (UI → Boundary → Services → Adapters). |
-| **`arch/suite.js` (AST Scanner)** | CI (`tests/arch`) | AI creates exposed Server Actions (`'use server'`) without authentication/role guards (`requireAuth`, `requireRole`). | **Broken Object Level Authorization (BOLA/IDOR)**: Guarantees every exported action has a verified session guard. |
-| **`check-tests-changed`** | CI PR Gate | AI refactors or adds application logic but skips writing tests, claiming "it works". | **Regression Prevention & TDD**: PR fails if `src/` changes without matching test modifications. |
-| **`check-diff-coverage`** | CI PR Gate | AI writes pseudo-tests that run empty assertions or don't execute newly added logic. | **AI Slop Defense**: Requires at least 80% coverage on newly touched lines. |
-| **`check-bundle`** | CI Post-Build | Internal database IDs (e.g. `CUST-`, `INTERNAL-`) or secret constants leaked into client-side JS bundles. | **Information Disclosure**: Scans client JavaScript in `.next/static` for sensitive markers. |
-| **Semgrep / CodeQL** | CI Security Pipeline | Known insecure coding patterns, prototype pollution, SSRF, path traversal. | **SAST**: Automated vulnerability scanning on every PR. |
-| **`doctor` & `upgrade`** | Local CLI & CI | Configuration drift: projects initialized months ago missing new security patches and hook updates. | **Fleet Consistency**: Cryptographically tracks template drift and provides safe upgrades. |
-| **Superpowers Subagent Dual-Control** | Agent Runtime | Single agent "cheating" its own evaluation, hallucinating test results, or deviating from plan. | **Four-Eyes Governance**: Separates the implementer agent from an independent, fresh-context reviewer agent. |
+| **gitleaks** | Coding (Local) & Testing (CI) | AI accidentally commits API keys, Firebase service account credentials, or `.env` files into git history. | **Secrets & Credential Hygiene**: Halts commits locally; audits full git history in CI. |
+| **`check-files`** | Coding (Local) & Testing (CI) | AI commits internal documentation (`.docx`, `.pdf`, `.xlsx`), raw keys (`.pem`, `.key`), or local environments. | **Data Leakage & Asset Sprawl**: Rejects disallowed extensions before staging. |
+| **ESLint Security Plugin** | Coding (Local) & Testing (CI) | Direct client writes to DB (`setDoc`, `addDoc`), secret access in `NEXT_PUBLIC_*`, `any` type casts, `dangerouslySetInnerHTML`. | **Injection & Authorization Bypass**: Guarantees writes go through server actions; stops client data poisoning. |
+| **dependency-cruiser** | Design & Testing (CI) | UI directly importing server adapters/database modules; circular dependencies; domain layer corruption. | **Architectural Integrity**: Enforces strict boundaries (UI → Boundary → Services → Adapters). |
+| **`arch/suite.js` (AST Scanner)** | Testing (CI) | AI creates exposed Server Actions (`'use server'`) without authentication/role guards (`requireAuth`, `requireRole`). | **Broken Object Level Authorization (BOLA/IDOR)**: Guarantees every exported action has a verified session guard. |
+| **`check-tests-changed`** | Testing (CI) | AI refactors or adds application logic but skips writing tests, claiming "it works". | **Regression Prevention & TDD**: PR fails if `src/` changes without matching test modifications. |
+| **`check-diff-coverage`** | Testing (CI) | AI writes pseudo-tests that run empty assertions or don't execute newly added logic. | **AI Slop Defense**: Requires at least 80% coverage on newly touched lines. |
+| **`check-bundle`** | Testing (CI Post-Build) | Internal database IDs (e.g. `CUST-`, `INTERNAL-`) or secret constants leaked into client-side JS bundles. | **Information Disclosure**: Scans client JavaScript in `.next/static` for sensitive markers. |
+| **Semgrep / CodeQL** | Testing (CI SAST) | Known insecure coding patterns, prototype pollution, SSRF, path traversal. | **SAST**: Automated vulnerability scanning on every PR. |
+| **`@oneup4real/standards/firebase-testing`** | Testing (CI Emulated) | Database security rules regressions; unauthorized role privilege escalation in Firestore. | **Authorization Testing**: Automated test runner against local emulator for allowed & denied cases. |
+| **`@oneup4real/standards/next/headers`** | Release & Deployment | Clickjacking, MIME sniffing, cross-site scripting (XSS), missing HSTS/CSP. | **Runtime Defense**: Injects hardened production HTTP security headers. |
+| **`doctor` & `upgrade`** | Operations & Fleet | Configuration drift: projects initialized months ago missing new security patches and hook updates. | **Fleet Consistency**: Cryptographically tracks template drift and provides safe upgrades. |
+| **Superpowers Subagent Dual-Control** | Design & Coding | Single agent "cheating" its own evaluation, hallucinating test results, or deviating from plan. | **Four-Eyes Governance**: Separates the implementer agent from an independent, fresh-context reviewer agent. |
 
 ---
 
-## 3. Architectural Guardrails
+## 4. Architectural Guardrails & Threat Boundaries
 
 Applications using these standards follow a strict layered Clean Architecture:
 
@@ -148,7 +186,7 @@ graph TD
 
 ---
 
-## 4. Subagent Dual-Control Protocol
+## 5. Subagent Dual-Control Protocol
 
 When AI coding tools (Claude Code, Antigravity, Cursor, Codex) execute non-trivial tasks in projects using `@oneup4real/standards`, they are bound by the **Subagent Dual-Control Protocol** defined in `AGENTS.global.md`:
 
@@ -194,7 +232,7 @@ sequenceDiagram
 
 ---
 
-## 5. Quickstart: New Projects
+## 6. Quickstart: New Projects
 
 Create your project, initialize git, and run the wizard:
 
@@ -210,7 +248,7 @@ The interactive wizard asks 8 clear questions, selects recommended Secure SDLC s
 
 ---
 
-## 6. Quickstart: Existing Projects
+## 7. Quickstart: Existing Projects
 
 You can bring legacy codebases under standards governance without turning your entire CI pipeline red on day one:
 
@@ -240,7 +278,7 @@ From this point forward, **only new violations fail**. Existing legacy violation
 
 ---
 
-## 7. Fleet Anti-Drift: Doctor & Upgrade
+## 8. Fleet Anti-Drift: Doctor & Upgrade
 
 As `@oneup4real/standards` evolves, how do you prevent older projects from becoming out-of-date?
 
@@ -283,7 +321,7 @@ npx oneup-standards upgrade --force
 
 ---
 
-## 8. Make the Checks Mandatory on GitHub
+## 9. Make the Checks Mandatory on GitHub
 
 Local hooks catch mistakes on your machine, but GitHub branch protection prevents anyone (human or agent) from bypassing them with `--no-verify`.
 
@@ -305,7 +343,7 @@ Create a ruleset targeting the default branch:
 
 ---
 
-## 9. What Happens When (Pipeline Breakdown)
+## 10. What Happens When (Pipeline Breakdown)
 
 | Event | Execution Target | Checks Executed | Fail Conditions |
 |---|---|---|---|
@@ -317,7 +355,7 @@ Create a ruleset targeting the default branch:
 
 ---
 
-## 10. A Check Failed. What Now?
+## 11. A Check Failed. What Now?
 
 | Failure Message / Symptom | Root Cause | Proper Remediation |
 |---|---|---|
@@ -335,7 +373,7 @@ Create a ruleset targeting the default branch:
 
 ---
 
-## 11. CLI Commands Reference
+## 12. CLI Commands Reference
 
 All commands are available via `npx oneup-standards <command>`:
 
@@ -354,7 +392,7 @@ All commands are available via `npx oneup-standards <command>`:
 
 ---
 
-## 12. Importable Building Blocks
+## 13. Importable Building Blocks
 
 Projects consuming `@oneup4real/standards` can import standard presets directly:
 
@@ -372,7 +410,7 @@ Projects consuming `@oneup4real/standards` can import standard presets directly:
 
 ---
 
-## 13. Appendices (Deep Technical Details)
+## 14. Appendices (Deep Technical Details)
 
 ### Appendix A: The Three Delivery Channels
 
