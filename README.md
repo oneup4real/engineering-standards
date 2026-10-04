@@ -67,50 +67,66 @@ The following diagram illustrates how changes travel from prompt to production a
 
 ```mermaid
 flowchart TD
-    subgraph S1["Phase 1 & 2: Requirements & Threat Modeling"]
-        HumanLead[Human Lead / Product] -->|Define Goal| Spec[Spec & Plan\nwriting-plans]
-        Spec --> ThreatModel[Identify Trust Boundaries & Auth Requirements]
+    subgraph P1["Phase 1: Requirements & Threat Modeling"]
+        HumanLead[Human Lead & Product] -->|1. Clarify Requirements| Brainstorm[brainstorming & writing-plans]
+        Brainstorm -->|2. Threat Analysis| STRIDE[Define Trust Boundaries\nAuthZ & Data Exposure Rules]
     end
 
-    subgraph S2["Phase 3: Shift-Left Dev & Pre-Commit Gates"]
-        ThreatModel -->|Task Dispatch| Agent[AI Implementer Subagent]
-        Agent -->|1. Test-First TDD| Code[Code + Tests]
-        Code -->|git commit| HookCommit[Husky Pre-Commit Hook]
-        HookCommit -->|Check 1| ScanFiles[oneup-standards check-files\nBlock .env, keys, office docs]
-        HookCommit -->|Check 2| GitleaksLocal[gitleaks protect --staged\nSecret Scan]
-        HookCommit -->|Check 3| LintStaged[lint-staged\neslint --max-warnings=0]
+    subgraph P2["Phase 2: Secure Architecture & Design"]
+        STRIDE --> ArchDesign[Clean Architecture Layers\nUI → Actions → Services → Adapters]
+        ArchDesign --> ZodContracts[Zod Input Validation Contracts\n& Deny-by-Default Firestore Rules]
+    end
+
+    subgraph P3["Phase 3: Secure Coding & Shift-Left Dev (Workstation)"]
+        ZodContracts -->|Task Dispatch| Agent[AI Implementer Subagent]
+        Agent -->|3. Test-First TDD| Code[Write Failing Test → Implement Code]
+        Code -->|git commit| HookCommit[Husky Pre-Commit Gate]
+        HookCommit -->|Scan 1| ScanFiles[oneup-standards check-files\nBlock .env, keys, office docs]
+        HookCommit -->|Scan 2| GitleaksLocal[gitleaks protect --staged\nSecret Scan]
+        HookCommit -->|Scan 3| LintStaged[lint-staged\neslint --max-warnings=0]
         
         HookCommit -->|Pass| CommitOK[Commit Staged]
-        CommitOK -->|git push| HookPush[Husky Pre-Push Hook]
-        HookPush -->|Check 4| TscLocal[tsc --noEmit\nType Validation]
+        CommitOK -->|git push| HookPush[Husky Pre-Push Gate]
+        HookPush -->|Check 4| TscLocal[tsc --noEmit\nStrict Typecheck]
         HookPush -->|Check 5| VitestLocal[npm test\nUnit Tests Pass]
     end
 
-    subgraph S3["Phase 4: Automated CI Verification & Security Testing"]
+    subgraph P4["Phase 4: Automated CI Verification & Security Testing"]
         HookPush -->|Pass & Push| PR[Pull Request Opened]
         PR --> CI_Job[ci-node.yml @v1]
         PR --> Sec_Job[security.yml @v1]
         
-        CI_Job --> CI_Drift[Standards Doctor\nDetect Drift]
-        CI_Job --> CI_TDD[check-tests-changed\nFail if code changed without tests]
+        CI_Job --> CI_Drift[oneup-standards doctor --warn-only\nDetect Config Drift]
+        CI_Job --> CI_TDD[check-tests-changed\nEnforce TDD: source changed ⇒ test changed]
         CI_Job --> CI_DiffCov[check-diff-coverage\nChanged-line coverage >= 80%]
         CI_Job --> CI_Arch[dependency-cruiser\nLayer boundary rules]
         CI_Job --> CI_Suite[arch/suite.js\nServer-only, Action guards, Write ratchet]
+        CI_Job --> CI_Emul[firebase-testing\nEmulated database rules tests]
         CI_Job --> CI_Build[npm run build\nProduction compile]
         CI_Job --> CI_Bundle[check-bundle\nScan built JS for confidential markers]
 
-        Sec_Job --> Sec_Leaks[gitleaks --full-history\nFull repo scan]
-        Sec_Job --> Sec_Audit[npm audit\nSCA dependency audit]
-        Sec_Job --> Sec_SAST[Semgrep / CodeQL\nSAST code scanning]
+        Sec_Job --> Sec_Leaks[gitleaks --full-history\nFull git history audit]
+        Sec_Job --> Sec_Audit[npm audit\nSCA dependency vulnerability scan]
+        Sec_Job --> Sec_SAST[Semgrep / CodeQL\nSAST code security scan]
     end
 
-    subgraph S4["Phase 5 & 6: Secure Release & Fleet Governance"]
-        CI_Job --> PR_Review[Independent Reviewer Subagent\n+ Human Approval]
-        Sec_Job --> PR_Review
-        PR_Review -->|Merge to main| Release[Production Release\nsecurityHeaders & Ruleset]
-        Release --> Central[Fleet Governance]
-        Central -->|oneup-standards doctor / upgrade| AntiDrift[Cryptographic Anti-Drift]
+    subgraph P5["Phase 5: Secure Release & Deployment"]
+        CI_Job --> DualControl[Independent Reviewer Subagent\nFour-Eyes Code Verification]
+        Sec_Job --> DualControl
+        DualControl --> HumanApproval{Human Lead Review\n& PR Approval}
+        HumanApproval -->|Merge to default branch| GitHubRuleset[GitHub Branch Ruleset\nBlock force push & require green checks]
+        GitHubRuleset --> ProductionDeploy[Production Release\nNext.js securityHeaders: CSP, HSTS, XFO]
+        ProductionDeploy --> HumanRulesDeploy[Security Rules Deployment\nHuman only, never automated]
     end
+
+    subgraph P6["Phase 6: Operations & Fleet Governance"]
+        CentralRepo[oneup4real/engineering-standards] -->|Dependabot Bump PR| ProjectRepo[Project Repository]
+        ProjectRepo --> DoctorCheck[oneup-standards doctor\nContinuous Drift Audit]
+        DoctorCheck --> UpgradeApply[oneup-standards upgrade\nSHA-256 Anti-Drift Sync]
+        ProjectRepo --> RatchetTrack[Monotonic Ratchets\nViolations must only decrease]
+    end
+
+    P6 -.->|Harvest Best Practices| P1
 ```
 
 ---
