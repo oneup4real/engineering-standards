@@ -391,11 +391,16 @@ npx oneup-standards upgrade --dry-run
 # Apply safe upgrades:
 npx oneup-standards upgrade
 
+# Smart non-destructive merge (recommended for customized projects):
+# Keeps your custom CI jobs (e.g. Firebase emulators) and PR template sections,
+# while injecting missing shared security scans (Semgrep, Gitleaks) and TDD checks:
+npx oneup-standards upgrade --merge
+
 # Force replacement of customized files (creates .bak backups):
 npx oneup-standards upgrade --force
 ```
 
-> **Safety Guarantee:** `upgrade` uses cryptographic SHA-256 fingerprints stored in `.standardsrc.json`. It will **never** overwrite a template file that you customized locally, unless you explicitly pass `--force`.
+> **Safety Guarantee:** `upgrade` uses cryptographic SHA-256 fingerprints stored in `.standardsrc.json`. It will **never** overwrite a template file that you customized locally, unless you explicitly pass `--force`. When `--merge` is used, customized files are intelligently merged without losing project-specific features, and their merged fingerprints are recorded so `doctor` recognizes them as up to date.
 
 ---
 
@@ -459,7 +464,7 @@ All commands are available via `npx oneup-standards <command>`:
 |---|---|---|
 | `init` | `[--yes]` | Interactive setup wizard for new or existing projects (`--yes` accepts recommended answers). |
 | `doctor` | `[--warn-only]` | Diagnoses configuration drift, missing hooks, outdated templates, AI skills, and environment status. |
-| `upgrade` | `[--force] [--dry-run]` | Safely synchronizes template files, hooks, and AI rules. Uses `--force` to replace customized files. |
+| `upgrade` | `[--merge] [--force] [--dry-run]` | Safely synchronizes template files, hooks, and AI rules. Uses `--merge` to combine customized files, or `--force` to replace. |
 | `sync-skills` | `[--project] [--dry-run]` | Discovers and synchronizes AI skills (`superpowers`, `frontend-design`, `superdesign`, etc.) into Antigravity (`~/.gemini/config/skills`). |
 | `check-skills` | none | Verifies required AI skills (`test-driven-development`, `brainstorming`, `superdesign`, etc.) are installed in Antigravity. |
 | `baseline` | none | Generates `.dependency-cruiser-known-violations.json` from current code to ratchet existing architectural violations. |
@@ -529,15 +534,18 @@ flowchart TD
     
     Hash --> CompareTemplate{Equals Current Template?}
     CompareTemplate -->|Yes| OK[Status: OK]
-    CompareTemplate -->|No| CompareRecorded{Equals Recorded Hash in .standardsrc.json?}
+    CompareTemplate -->|No| CompareMerged{Equals Recorded Merged Hash?}
+    
+    CompareMerged -->|Yes| OK
+    CompareMerged -->|No| CompareRecorded{Equals Recorded Managed Hash?}
     
     CompareRecorded -->|Yes| Outdated[Status: OUTDATED\nFile was never touched by user;\nsafe to auto-replace on upgrade]
-    CompareRecorded -->|No| Customized[Status: CUSTOMIZED\nUser made local edits;\nDo NOT overwrite unless --force]
+    CompareRecorded -->|No| Customized[Status: CUSTOMIZED\nUser made local edits;\nUse --merge to combine or --force to replace]
 ```
 
 - When the wizard writes a template, it records `managed[relFile] = "sha256:..."` in `.standardsrc.json`.
 - `upgrade` replaces `outdated` files automatically.
-- `customized` files are protected; running `upgrade --force` replaces them but preserves an exact backup copy as `<file>.bak`.
+- `customized` files can be non-destructively merged with `upgrade --merge` (which injects missing standard jobs/sections and records the merged fingerprint in `merged[relFile]`), or replaced with `upgrade --force` (which preserves an exact backup copy as `<file>.bak`).
 
 ---
 

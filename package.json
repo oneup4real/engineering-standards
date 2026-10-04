@@ -1,6 +1,6 @@
 {
   "name": "@oneup4real/standards",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "description": "Secure-SDLC standards: shared lint/type/architecture/test configs, git hooks, CI workflows, AI-agent instructions and a setup wizard.",
   "license": "MIT",
   "type": "module",
@@ -49,15 +49,16 @@
     "dependency-cruiser": "^18.4.0",
     "globals": "^17.12.0",
     "lint-staged": "^16.4.0",
-    "typescript-eslint": "^8.71.0"
+    "typescript-eslint": "^8.71.0",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^5.0.3",
     "eslint": "^10.11.0",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.3",
-    "yaml": "^2.9.1"
+    "vitest": "^5.0.3"
   },
+
   "peerDependencies": {
     "@firebase/rules-unit-testing": ">=3",
     "eslint": ">=9",

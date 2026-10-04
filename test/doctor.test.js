@@ -324,9 +324,66 @@ describe('upgradeProject', () => {
     expect(results.find((r) => r.file.endsWith('.lintstagedrc.json')).action).toBe('created');
   });
 
+  it('upgrade --merge combines customized files and causes doctor to report ok', async () => {
+    const { dir, home } = await connectedProject(NO_HOOKS);
+    const ciPath = path.join(dir, '.github/workflows/ci.yml');
+    const customCi = `name: Custom CI
+on:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm test
+`;
+    await fs.writeFile(ciPath, customCi);
+
+    // Doctor initially reports customized
+    const initialReport = await inspectProject({ targetDir: dir, homeDir: home });
+    expect(statusOf(initialReport, '.github/workflows/ci.yml')).toBe('customized');
+
+    // Run upgrade with --merge
+    const io = makeIo(dir, { HOME: home });
+    expect(await runCli(['upgrade', '--merge'], io)).toBe(0);
+    expect(io.out).toMatch(/merged\s+\.github\/workflows\/ci\.yml/);
+
+    // Verify file content has both custom job and security job
+    const mergedCi = await read(ciPath);
+    expect(mergedCi).toContain('validate:');
+    expect(mergedCi).toContain('security:');
+    expect(await exists(`${ciPath}.bak`)).toBe(true);
+
+    // Verify .standardsrc.json recorded the merged file hash
+    const config = await readJson(path.join(dir, '.standardsrc.json'));
+    expect(config.merged['.github/workflows/ci.yml']).toBe(hashContent(mergedCi));
+
+    // Subsequent doctor check exits 0 with status ok!
+    const doctorReport = await inspectProject({ targetDir: dir, homeDir: home });
+    expect(statusOf(doctorReport, '.github/workflows/ci.yml')).toBe('ok');
+    expect(await runCli(['doctor'], makeIo(dir, { HOME: home }))).toBe(0);
+  });
+
+  it('upgrade --merge on already merged or up to date file is recognized as unchanged/ok', async () => {
+    const { dir, home } = await connectedProject(NO_HOOKS);
+    const prTemplatePath = path.join(dir, '.github/pull_request_template.md');
+    await fs.appendFile(prTemplatePath, '\n## Custom Notes\n\nCustom note text\n');
+
+    // Merge once
+    await upgradeProject({ targetDir: dir, homeDir: home, merge: true });
+    const doctor1 = await inspectProject({ targetDir: dir, homeDir: home });
+    expect(statusOf(doctor1, '.github/pull_request_template.md')).toBe('ok');
+
+    // Second upgrade with merge
+    const res = await upgradeProject({ targetDir: dir, homeDir: home, merge: true });
+    expect(res.find((r) => r.file.endsWith('.github/pull_request_template.md'))).toBeUndefined();
+  });
+
   it('refuses to upgrade a project that is not connected', async () => {
     const dir = await tempDir();
     await fs.writeFile(path.join(dir, 'package.json'), JSON.stringify({ name: 'plain' }));
     await expect(upgradeProject({ targetDir: dir, homeDir: await tempDir() })).rejects.toThrow(/oneup-standards init/);
   });
 });
+
