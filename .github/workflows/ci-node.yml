@@ -17,6 +17,10 @@ on:
         description: Command that builds the project
         type: string
         default: npm run build
+      test-command:
+        description: Command for unit tests (e.g. npm test or vitest run tests/unit); empty = vitest run --coverage
+        type: string
+        default: ''
       rules-test-command:
         description: Command for database security-rules tests (e.g. npm run test:rules); empty = skip
         type: string
@@ -92,7 +96,9 @@ jobs:
 
       - name: Unit tests (with coverage)
         run: |
-          if ls vitest.config.* >/dev/null 2>&1; then
+          if [ -n "${{ inputs.test-command }}" ]; then
+            ${{ inputs.test-command }}
+          elif ls vitest.config.* >/dev/null 2>&1; then
             npx --no-install vitest run --coverage
           else
             echo "::warning::No vitest config: running 'npm test' without coverage thresholds."
