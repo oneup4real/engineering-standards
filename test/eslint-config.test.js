@@ -57,6 +57,11 @@ describe('base config', () => {
   it('no-explicit-any is error', async () => {
     expect(await lint('export const a: any = 1;', 'src/lib/a.ts', base)).toContain('@typescript-eslint/no-explicit-any');
   });
+
+  it('ignores .agents/**', () => {
+    const ignoreConfig = base.find((c) => c.ignores);
+    expect(ignoreConfig.ignores).toContain('.agents/**');
+  });
 });
 
 describe('nextjs preset', () => {

@@ -7,7 +7,7 @@ import { strictness } from './strictness.js';
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
-  { ignores: ['node_modules/**', 'dist/**', 'build/**', 'coverage/**', '.next/**', 'out/**'] },
+  { ignores: ['node_modules/**', 'dist/**', 'build/**', 'coverage/**', '.next/**', 'out/**', '.agents/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   ...securityRules,

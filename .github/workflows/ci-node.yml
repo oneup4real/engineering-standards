@@ -80,7 +80,12 @@ jobs:
         run: git ls-files -z | xargs -0 npx --no-install oneup-standards check-files
 
       - name: Lint (warnings fail too)
-        run: npx --no-install eslint . --max-warnings=0
+        run: |
+          if [ -f .eslint-suppressions.json ]; then
+            npx --no-install eslint . --max-warnings=0 --suppressions-location .eslint-suppressions.json
+          else
+            npx --no-install eslint . --max-warnings=0
+          fi
 
       - name: Typecheck
         run: npx --no-install tsc --noEmit

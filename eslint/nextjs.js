@@ -53,7 +53,7 @@ const nextConfigs = await loadNextConfigs();
 export default nextConfigs === null
   ? base
   : [
-      { ignores: ['node_modules/**', '.next/**', 'out/**', 'build/**', 'coverage/**', 'next-env.d.ts'] },
+      { ignores: ['node_modules/**', '.next/**', 'out/**', 'build/**', 'coverage/**', 'next-env.d.ts', '.agents/**'] },
       ...nextConfigs,
       ...securityRules,
       strictness,

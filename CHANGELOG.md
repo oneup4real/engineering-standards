@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.0] - 2026-10-04
+
+### Added
+- **Monotonic ESLint Ratchet**: `oneup-standards baseline` now records `.eslint-suppressions.json` alongside `.dependency-cruiser-known-violations.json` so existing lint violations are frozen and only new ones fail.
+- **Ratchets & Technical Debt Tracking in Doctor**: `oneup-standards doctor` now displays an overview of all active monotonic ratchets and technical debt (ESLint suppressions, architecture layer violations, direct DB writes, unguarded server actions).
+- **Reusable CI Pipeline (`ci-node.yml`)**: Automatically enforces `.eslint-suppressions.json` with `--suppressions-location` when present.
+- **ESLint Agent Ignores**: Added `.agents/**` to default `ignores` in base and Next.js presets so AI skills scripts are excluded from project linting.
+
 ## [1.3.0] - 2026-10-03
 
 ### Added
