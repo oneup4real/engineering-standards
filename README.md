@@ -15,12 +15,14 @@ One source of truth for the rules every project must follow. Projects connect on
 1. [Secure SDLC (SSDLC) Phase Mapping](#1-secure-sdlc-ssdlc-phase-mapping)
 2. [SSDLC Pipeline & Architecture Flow](#2-ssdlc-pipeline--architecture-flow)
 3. [Tools Used & Risk Mitigation Matrix](#3-tools-used--risk-mitigation-matrix)
+    - [Defense-in-Depth: SAST vs. Linting vs. Testing](#defense-in-depth-sast-vs-linting-vs-testing)
 4. [Architectural Guardrails & Threat Boundaries](#4-architectural-guardrails--threat-boundaries)
 5. [Subagent Dual-Control Protocol](#5-subagent-dual-control-protocol)
 6. [Cross-Harness AI Skill Governance (Antigravity & Claude Code)](#6-cross-harness-ai-skill-governance-antigravity--claude-code)
 7. [Quickstart: New Projects](#7-quickstart-new-projects)
 8. [Quickstart: Existing Projects](#8-quickstart-existing-projects)
 9. [Fleet Anti-Drift: Doctor & Upgrade](#9-fleet-anti-drift-doctor--upgrade)
+    - [Smart Non-Destructive Merging (`--merge`)](#smart-non-destructive-merging-merge)
 10. [Make the Checks Mandatory on GitHub](#10-make-the-checks-mandatory-on-github)
 11. [What Happens When (Pipeline Breakdown)](#11-what-happens-when-pipeline-breakdown)
 12. [A Check Failed. What Now?](#12-a-check-failed-what-now)
@@ -152,6 +154,35 @@ Every tool incorporated into `@oneup4real/standards` is targeted at specific rea
 | **`@oneup4real/standards/next/headers`** | Release & Deployment | Clickjacking, MIME sniffing, cross-site scripting (XSS), missing HSTS/CSP. | **Runtime Defense**: Injects hardened production HTTP security headers. |
 | **`doctor` & `upgrade`** | Operations & Fleet | Configuration drift: projects initialized months ago missing new security patches and hook updates. | **Fleet Consistency**: Cryptographically tracks template drift and provides safe upgrades. |
 | **Superpowers Subagent Dual-Control** | Design & Coding | Single agent "cheating" its own evaluation, hallucinating test results, or deviating from plan. | **Four-Eyes Governance**: Separates the implementer agent from an independent, fresh-context reviewer agent. |
+
+### Defense-in-Depth: SAST vs. Linting vs. Testing
+
+A common question in engineering teams is: *why do we need three separate verification tools, and where should each one run?*
+
+```mermaid
+flowchart LR
+    Dev["Developer / Agent\n(Local Workstation)"] --> Hook1["1. git commit\nHusky Pre-Commit"]
+    Hook1 --> ESLint["ESLint\n(Fast AST syntax checks\n& direct DB write bans)\n~200ms"]
+    
+    Dev --> Hook2["2. git push\nHusky Pre-Push"]
+    Hook2 --> Vitest["Vitest\n(Unit, behavioral, arch suite,\n& coverage thresholds)\n~500ms"]
+    
+    Dev --> PR["3. Pull Request\nGitHub Actions CI"]
+    PR --> Semgrep["Semgrep / CodeQL (SAST)\n(Deep semantic taint-tracking,\nSSRF, injection across files)\n~1-2 mins"]
+```
+
+| Defense Layer | Primary Tool | Where It Runs | Primary Objective | Why It Runs There |
+|---|---|---|---|---|
+| **Behavioral Verification** | **Vitest** | Workstation (pre-push) & CI | Verifies functional behavior, business logic, regressions, and coverage thresholds. | Fast execution (100–500ms) gives instant developer feedback on every push without waiting for cloud CI. |
+| **Workstation Linting** | **ESLint** | Workstation (pre-commit) & CI | Catches forbidden AST syntax patterns (direct client DB writes, secrets in `NEXT_PUBLIC_*`, `any` type casts). | Sub-second AST parsing blocks dangerous patterns before code is ever committed to local history. |
+| **Deep Code Analysis (SAST)** | **Semgrep** / **CodeQL** | GitHub Actions CI (PR & Push) | Semantic taint-tracking, SSRF, injection vulnerabilities, prototype pollution across file boundaries. | Comprehensive vulnerability rule suites require containerized runtimes and multi-file AST indexing, which would unacceptably slow down local git commit workflows. |
+
+> **What happens if someone pushes directly to `main` without a Pull Request?**
+> Local Husky hooks (`pre-commit` and `pre-push`) still run on the developer's machine. However, human engineers or automated scripts could bypass local hooks using `--no-verify`. Furthermore, SAST security scans (Semgrep/CodeQL) run in GitHub Actions.
+> 
+> To guarantee that code cannot reach production without running SAST:
+> 1. Both `ci-node.yml` and `security.yml` trigger on both `pull_request` **and** `push: branches: [main]`. If a direct push occurs, GitHub Actions still executes all security scans and alerts if vulnerabilities exist.
+> 2. **Enforce Branch Rulesets:** As documented in [Section 10](#10-make-the-checks-mandatory-on-github), repositories must enable GitHub Branch Rulesets that block direct pushes to `main` and require all pull request checks to pass before merging.
 
 ---
 
@@ -336,7 +367,9 @@ npx oneup-standards init
 ```
 
 The wizard guides you through setup and automates the migration:
-- **Merges ESLint & TypeScript rules** without overwriting your custom rules.
+- **Smart CI & Workflow Merging (Recommended):** If your repository already has `.github/workflows/ci.yml` (e.g. Firebase emulator runners, Docker services, custom test setups), the wizard preserves your existing jobs and injects the shared security scans (`security` job with Semgrep SAST, Gitleaks, and audit). A backup (`ci.yml.bak`) is always saved.
+- **Pull Request Template Merging:** Preserves custom template sections and injects missing standard sections (like TDD Verification) and checklists.
+- **Merges ESLint & TypeScript rules:** Keeps existing local rules via `eslint.config.local.mjs` while adding shared security rules.
 - **Freezes Legacy Architecture Violations:** Automatically creates `.dependency-cruiser-known-violations.json` so current code passes CI and only *new* violations fail.
 - **Prompts for Confidential Markers:** Configures strings (e.g. `CUST-` or `INTERNAL-`) in `.standardsrc.json` that must never appear in client JS bundles.
 - **Installs Git Hooks:** Configures Husky pre-commit and pre-push verification.
@@ -402,6 +435,35 @@ npx oneup-standards upgrade --force
 
 > **Safety Guarantee:** `upgrade` uses cryptographic SHA-256 fingerprints stored in `.standardsrc.json`. It will **never** overwrite a template file that you customized locally, unless you explicitly pass `--force`. When `--merge` is used, customized files are intelligently merged without losing project-specific features, and their merged fingerprints are recorded so `doctor` recognizes them as up to date.
 
+### Smart Non-Destructive Merging (`--merge`)
+
+When a project edits a managed file (for instance, adding a Firebase emulator runner or Docker service into `.github/workflows/ci.yml`), `doctor` identifies the file as `customized`. Previously, developers faced an all-or-nothing choice: skip upgrades forever or overwrite customizations with `--force`.
+
+With `npx oneup-standards upgrade --merge`, files are merged using AST-aware mergers:
+
+```mermaid
+flowchart TD
+    CustomFile[Your Customized File\ne.g. custom CI with Firebase emulators] --> Merger{Smart Merger Routing\nlib/mergers.js}
+    Template[Central Template\ne.g. Semgrep SAST & Gitleaks] --> Merger
+    
+    Merger -->|YAML Workflow| YamlAst[YAML AST Document Parser\nPreserves comments, formatting & custom jobs\nInjects missing security jobs]
+    Merger -->|Markdown| MdParser[Markdown Section Parser\nPreserves custom notes & sections\nInjects TDD checklist & DoD gates]
+    Merger -->|JSON| JsonParser[JSON Object Merger\nPreserves custom lint-staged keys]
+    
+    YamlAst --> MergedFile[Merged Output File\nBacked up to <file>.bak]
+    MdParser --> MergedFile
+    JsonParser --> MergedFile
+    
+    MergedFile --> Fingerprint[Record SHA-256 in .standardsrc.json\nunder config.merged]
+    Fingerprint --> DoctorOK[doctor reports: OK ✔\nConfiguration drift resolved!]
+```
+
+1. **YAML Workflows (`ci.yml`):** Uses native YAML AST parsing to preserve comments, indentation, and custom jobs (like Firebase emulator setups). If your project already has a test runner, it retains it and injects the central `security` job (`security.yml@v1` with Semgrep, Gitleaks, and audit).
+2. **Markdown Files (`pull_request_template.md`):** Parses Markdown `## ` sections. Keeps your custom PR description templates intact while injecting missing standards sections (such as *Tests (test-driven development)*) and checklist items (`- [ ]`).
+3. **JSON Configs (`.lintstagedrc.json`):** Preserves custom file-match patterns while adding missing standards linters.
+4. **Safety & Rollback:** Before modifying any customized file, `upgrade --merge` creates an exact timestamped `.bak` copy.
+5. **Drift Resolution:** Once merged, the file's SHA-256 hash is recorded in `.standardsrc.json` under `config.merged[relFile]`. Subsequent runs of `oneup-standards doctor` recognize the customized file as up to date (`ok`).
+
 ---
 
 ## 10. Make the Checks Mandatory on GitHub
@@ -414,13 +476,16 @@ Create a ruleset targeting the default branch:
 - ✅ **Block force pushes**
 - ✅ **Require a pull request before merging**
 - ✅ **Require status checks to pass:**
-  - `ci / ci`
+  - `ci / ci` *(or your custom job name if merged, e.g. `validate`)*
   - `security / gitleaks`
   - `security / audit`
-  - `security / semgrep` (or `security / codeql`)
+  - `security / semgrep` *(or `security / codeql`)*
 
 ### 2. Code Security (Repository Settings → Code security)
 - Enable **Secret scanning** and **Push protection**.
+
+> **Why Branch Rulesets are Non-Negotiable:**
+> Local git hooks run only on the local machine and can be bypassed by humans or misconfigured bots using `--no-verify`. Furthermore, SAST vulnerability scans (Semgrep/CodeQL) run in GitHub Actions. Enforcing branch rulesets guarantees that **all** code must pass SAST, secret audits, and architecture checks in CI before it can be merged into production.
 
 *(If you have the GitHub CLI installed, `npx oneup-standards init` can automatically create this ruleset for you).*
 
@@ -485,7 +550,7 @@ Projects consuming `@oneup4real/standards` can import standard presets directly:
 | Import Path | Type | Description |
 |---|---|---|
 | `@oneup4real/standards/eslint/nextjs` | ESLint Config | Next.js flat ESLint preset with security rules, strictness, and React hooks validation. |
-| `@oneup4real/standards/eslint/base` | ESLint Config | Framework-agnostic base ESLint configuration. |
+| `@oneup4real/standards/eslint/base` | ESLint Config | Framework-agnostic base ESLint flat configuration (supports ESM, CJS, `.cjs` files, and Node env). |
 | `@oneup4real/standards/tsconfig/nextjs.json` | TSConfig | Strict TypeScript compiler settings for Next.js applications. |
 | `@oneup4real/standards/tsconfig/base.json` | TSConfig | Strict base TypeScript settings (`noImplicitAny`, `strictNullChecks`). |
 | `@oneup4real/standards/depcruise/layered` | Dependency Cruiser | Clean Architecture layer dependency validation rules. |
