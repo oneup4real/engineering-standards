@@ -17,20 +17,22 @@ One source of truth for the rules every project must follow. Projects connect on
 3. [Tools Used & Risk Mitigation Matrix](#3-tools-used--risk-mitigation-matrix)
 4. [Architectural Guardrails & Threat Boundaries](#4-architectural-guardrails--threat-boundaries)
 5. [Subagent Dual-Control Protocol](#5-subagent-dual-control-protocol)
-6. [Quickstart: New Projects](#6-quickstart-new-projects)
-7. [Quickstart: Existing Projects](#7-quickstart-existing-projects)
-8. [Fleet Anti-Drift: Doctor & Upgrade](#8-fleet-anti-drift-doctor--upgrade)
-9. [Make the Checks Mandatory on GitHub](#9-make-the-checks-mandatory-on-github)
-10. [What Happens When (Pipeline Breakdown)](#10-what-happens-when-pipeline-breakdown)
-11. [A Check Failed. What Now?](#11-a-check-failed-what-now)
-12. [CLI Commands Reference](#12-cli-commands-reference)
-13. [Importable Building Blocks](#13-importable-building-blocks)
-14. [Appendices (Deep Technical Details)](#14-appendices-deep-technical-details)
+6. [Cross-Harness AI Skill Governance (Antigravity & Claude Code)](#6-cross-harness-ai-skill-governance-antigravity--claude-code)
+7. [Quickstart: New Projects](#7-quickstart-new-projects)
+8. [Quickstart: Existing Projects](#8-quickstart-existing-projects)
+9. [Fleet Anti-Drift: Doctor & Upgrade](#9-fleet-anti-drift-doctor--upgrade)
+10. [Make the Checks Mandatory on GitHub](#10-make-the-checks-mandatory-on-github)
+11. [What Happens When (Pipeline Breakdown)](#11-what-happens-when-pipeline-breakdown)
+12. [A Check Failed. What Now?](#12-a-check-failed-what-now)
+13. [CLI Commands Reference](#13-cli-commands-reference)
+14. [Importable Building Blocks](#14-importable-building-blocks)
+15. [Appendices (Deep Technical Details)](#15-appendices-deep-technical-details)
     - [Appendix A: The Three Delivery Channels](#appendix-a-the-three-delivery-channels)
     - [Appendix B: Cryptographic Anti-Drift Fingerprinting](#appendix-b-cryptographic-anti-drift-fingerprinting)
     - [Appendix C: Monotonic Ratchets for Legacy Migration](#appendix-c-monotonic-ratchets-for-legacy-migration)
     - [Appendix D: TypeScript AST Guard Inspection](#appendix-d-typescript-ast-guard-inspection)
     - [Appendix E: Supply Chain Security & Action Pinning](#appendix-e-supply-chain-security--action-pinning)
+
 
 ---
 
@@ -248,7 +250,64 @@ sequenceDiagram
 
 ---
 
-## 6. Quickstart: New Projects
+## 6. Cross-Harness AI Skill Governance (Antigravity & Claude Code)
+
+Modern engineering teams often switch between **Claude Code CLI** and **Google Antigravity IDE** (frequently selecting Claude models like Sonnet 3.7 or Sonnet 3.5 directly inside Antigravity).
+
+### The Cross-Harness Problem
+1. **Harness Sandbox Boundary:** Claude Code stores plugins in `~/.claude/plugins/cache/`. When you run Claude *inside Antigravity*, Antigravity acts as the host harness. Its security policy explicitly blocks tools from reading foreign tool directories (`Permission denied: Matches default system policy`).
+2. **Snapshot Drift:** Manually copying skill folders (like Superpowers, Frontend Design, or Superdesign) into projects creates frozen snapshots that never receive upstream bugfixes or feature updates.
+3. **The Risk of Forgotten Skills:** If skills are not loaded, the AI agent falls back to generic, non-TDD behavior without threat modeling or systematic debugging.
+
+### Machine-Enforced Skill Protection
+
+`@oneup4real/standards` provides three layers of machine enforcement to guarantee required skills are active:
+
+```mermaid
+graph TD
+    Cache["Claude Plugin Cache / Repos\n(~/.claude/plugins/cache/)"] -->|npx oneup-standards sync-skills| AntiGrav["Antigravity Global Roots\n(~/.gemini/config/skills/)"]
+    
+    subgraph "Workstation Pre-Flight Guardrails"
+        SessionStart["AI Agent Starts Turn\n(Antigravity / Claude Code)"]
+        SessionStart --> CheckSkills{"Are Required Skills Loaded?\n(TDD, plans, debugging, design)"}
+        CheckSkills -->|Missing| Halt["⛔ HALT IMMEDIATELY\nAlert Engineer to run sync-skills\nRefuse to write code"]
+        CheckSkills -->|All Present| CodeAllowed["Proceed with TDD & Dual Control"]
+        
+        DoctorCheck["oneup-standards doctor / check-skills"] -->|Audit| SkillsStatus["Flag missing skills as actionable warnings"]
+    end
+    
+    AntiGrav --> CheckSkills
+```
+
+#### 1. Zero-Forget AI Pre-Flight Gate (`AGENTS.global.md`)
+Section 0 of `AGENTS.global.md` instructs every AI model at the prompt level:
+- Before writing code, the agent MUST verify that essential skills (`brainstorming`, `writing-plans`, `executing-plans`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `requesting-code-review`, `frontend-design`, `superdesign`) are loaded in its context.
+- **Halt Condition:** If any core skills are missing, the agent **stops immediately** and alerts the developer:
+  > ⚠️ **Required AI Skills Missing!** Run `npx oneup-standards sync-skills` in your terminal to synchronize your skills into Antigravity, then restart this conversation.
+
+#### 2. Automated Cross-Harness Synchronization (`sync-skills`)
+Synchronize all installed skills into Antigravity's global customization directory with zero manual copying:
+```bash
+# Sync all skills globally for all projects opened in Antigravity:
+npx oneup-standards sync-skills
+
+# Or sync locally into the current project workspace (.agents/skills):
+npx oneup-standards sync-skills --project
+```
+
+#### 3. Verification & Doctor Integration
+```bash
+# Explicitly verify installed skills before starting work:
+npx oneup-standards check-skills
+
+# Doctor checks your Antigravity skills directory during routine audits:
+npx oneup-standards doctor
+```
+
+---
+
+## 7. Quickstart: New Projects
+
 
 Create your project, initialize git, and run the wizard:
 
@@ -264,7 +323,7 @@ The interactive wizard asks 8 clear questions, selects recommended Secure SDLC s
 
 ---
 
-## 7. Quickstart: Existing Projects
+## 8. Quickstart: Existing Projects
 
 You can bring legacy codebases under standards governance without turning your entire CI pipeline red on day one:
 
@@ -294,7 +353,7 @@ From this point forward, **only new violations fail**. Existing legacy violation
 
 ---
 
-## 8. Fleet Anti-Drift: Doctor & Upgrade
+## 9. Fleet Anti-Drift: Doctor & Upgrade
 
 As `@oneup4real/standards` evolves, how do you prevent older projects from becoming out-of-date?
 
@@ -337,7 +396,7 @@ npx oneup-standards upgrade --force
 
 ---
 
-## 9. Make the Checks Mandatory on GitHub
+## 10. Make the Checks Mandatory on GitHub
 
 Local hooks catch mistakes on your machine, but GitHub branch protection prevents anyone (human or agent) from bypassing them with `--no-verify`.
 
@@ -359,7 +418,7 @@ Create a ruleset targeting the default branch:
 
 ---
 
-## 10. What Happens When (Pipeline Breakdown)
+## 11. What Happens When (Pipeline Breakdown)
 
 | Event | Execution Target | Checks Executed | Fail Conditions |
 |---|---|---|---|
@@ -371,7 +430,7 @@ Create a ruleset targeting the default branch:
 
 ---
 
-## 11. A Check Failed. What Now?
+## 12. A Check Failed. What Now?
 
 | Failure Message / Symptom | Root Cause | Proper Remediation |
 |---|---|---|
@@ -389,15 +448,17 @@ Create a ruleset targeting the default branch:
 
 ---
 
-## 12. CLI Commands Reference
+## 13. CLI Commands Reference
 
 All commands are available via `npx oneup-standards <command>`:
 
 | Command | Arguments / Flags | Description |
 |---|---|---|
 | `init` | `[--yes]` | Interactive setup wizard for new or existing projects (`--yes` accepts recommended answers). |
-| `doctor` | `[--warn-only]` | Diagnoses configuration drift, missing hooks, outdated templates, and environment status. |
+| `doctor` | `[--warn-only]` | Diagnoses configuration drift, missing hooks, outdated templates, AI skills, and environment status. |
 | `upgrade` | `[--force] [--dry-run]` | Safely synchronizes template files, hooks, and AI rules. Uses `--force` to replace customized files. |
+| `sync-skills` | `[--project] [--dry-run]` | Discovers and synchronizes AI skills (`superpowers`, `frontend-design`, `superdesign`, etc.) into Antigravity (`~/.gemini/config/skills`). |
+| `check-skills` | none | Verifies required AI skills (`test-driven-development`, `brainstorming`, `superdesign`, etc.) are installed in Antigravity. |
 | `baseline` | none | Generates `.dependency-cruiser-known-violations.json` from current code to ratchet existing architectural violations. |
 | `sync-agents` | `[--global]` | Refreshes managed shared rules in `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` (`--global` updates `~/.agents/AGENTS.md`). |
 | `check-files` | `[paths...]` | Fails if specified paths (default: staged files) contain office docs, keys, or `.env` files. |
@@ -408,7 +469,8 @@ All commands are available via `npx oneup-standards <command>`:
 
 ---
 
-## 13. Importable Building Blocks
+## 14. Importable Building Blocks
+
 
 Projects consuming `@oneup4real/standards` can import standard presets directly:
 
@@ -426,7 +488,7 @@ Projects consuming `@oneup4real/standards` can import standard presets directly:
 
 ---
 
-## 14. Appendices (Deep Technical Details)
+## 15. Appendices (Deep Technical Details)
 
 ### Appendix A: The Three Delivery Channels
 

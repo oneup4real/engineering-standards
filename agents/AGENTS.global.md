@@ -4,6 +4,27 @@ These rules apply to every project and every AI coding tool (Claude Code, Codex,
 Copilot, Cursor). They are binding. Project-specific rules elsewhere in this file add to them; where a
 project rule is stricter, the stricter rule wins.
 
+## 0. Mandatory Pre-Flight: AI Skills Verification
+
+Before writing code, designing features, or modifying files:
+Check whether the required AI skills are loaded in your context:
+- `brainstorming`
+- `writing-plans`
+- `executing-plans`
+- `test-driven-development`
+- `systematic-debugging`
+- `verification-before-completion`
+- `requesting-code-review`
+- `frontend-design`
+- `superdesign`
+
+**HALT IF SKILLS ARE MISSING:**
+If any core skills (`brainstorming`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`) are missing from your available skills, you MUST stop immediately before editing any code and alert the user:
+> ⚠️ **Required AI Skills Missing!**
+> The following skills are missing from this session: [list missing skills].
+> Please run `npx oneup-standards sync-skills` in your terminal to synchronize your skills into Antigravity (`~/.gemini/config/skills/`), then restart this conversation.
+> You must not proceed to write code without these skills active.
+
 ## 1. How to work: Subagent Dual-Control Protocol
 
 Every non-trivial task (more than a single 5-line edit) MUST follow this structured subagent execution cycle:
