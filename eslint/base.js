@@ -1,5 +1,6 @@
 // Base preset for TypeScript projects without a framework preset.
 import js from '@eslint/js';
+import globals from 'globals';
 import tseslint from 'typescript-eslint';
 import { securityRules } from './security.js';
 import { strictness } from './strictness.js';
@@ -11,4 +12,16 @@ export default [
   ...tseslint.configs.recommended,
   ...securityRules,
   strictness,
+  {
+    files: ['**/*.cjs', '**/*.cts'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: globals.node,
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+      'no-undef': 'off',
+    },
+  },
 ];
+
