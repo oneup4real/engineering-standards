@@ -64,6 +64,16 @@ describe('runWizard', () => {
     expect(d.calls).toContain('claude plugin install superpowers@superpowers-marketplace');
   });
 
+  it('offers to install superpowers into Antigravity when claude is missing but ~/.gemini exists', async () => {
+    const dir = await repo();
+    const home = await tempDir();
+    await fs.mkdir(path.join(home, '.gemini'), { recursive: true });
+    const d = { ...deps({ installed: ['gh', 'gitleaks'], answers: { installSuperpowers: true } }), homeDir: home };
+    await runWizard(makeIo(dir), d);
+    expect(d.prompts.some((p) => p.id === 'installSuperpowers')).toBe(true);
+    expect(d.calls.some((c) => c.includes('git clone') && c.includes('superpowers'))).toBe(true);
+  });
+
   it('offers to install gitleaks when missing and installs only on yes', async () => {
     const dir = await repo();
     const d = deps({ installed: ['gh', 'brew'], answers: { installGitleaks: true } });

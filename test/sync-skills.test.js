@@ -106,6 +106,28 @@ describe('sync-skills', () => {
     expect(io2.out).toMatch(/All required AI skills are installed/);
   });
 
+
+  it('discovers skills across custom marketplace directories like superpowers-marketplace', async () => {
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'standards-skills-'));
+    const home = path.join(tmp, 'home');
+    const spDir = path.join(home, '.claude', 'plugins', 'cache', 'superpowers-marketplace', 'superpowers', '6.4.2', 'skills');
+    await fs.mkdir(path.join(spDir, 'writing-plans'), { recursive: true });
+    await fs.writeFile(path.join(spDir, 'writing-plans', 'SKILL.md'), '# Writing Plans');
+
+    const discovered = await discoverSkills({ homeDir: home });
+    expect(discovered['writing-plans']).toBe(path.join(spDir, 'writing-plans'));
+  });
+
+  it('discovers skills in standalone ~/.superpowers directory', async () => {
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'standards-skills-'));
+    const home = path.join(tmp, 'home');
+    const spDir = path.join(home, '.superpowers', 'skills', 'test-driven-development');
+    await fs.mkdir(spDir, { recursive: true });
+    await fs.writeFile(path.join(spDir, 'SKILL.md'), '# TDD');
+
+    const discovered = await discoverSkills({ homeDir: home });
+    expect(discovered['test-driven-development']).toBe(spDir);
+  });
   it('sync-skills CLI command syncs skills and doctor reports ok', async () => {
     const { runCli } = await import('../lib/cli.js');
     const { makeIo } = await import('./helpers.js');
