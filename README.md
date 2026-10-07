@@ -283,20 +283,21 @@ sequenceDiagram
 
 ## 6. Cross-Harness AI Skill Governance (Antigravity & Claude Code)
 
-Modern engineering teams often switch between **Claude Code CLI** and **Google Antigravity IDE** (frequently selecting Claude models like Sonnet 3.7 or Sonnet 3.5 directly inside Antigravity).
+Modern engineering teams often switch between **Claude Code CLI** and **Google Antigravity IDE** (frequently selecting Claude models like Sonnet 3.7 or Sonnet 3.5 directly inside Antigravity) — or work exclusively in Antigravity.
 
 ### The Cross-Harness Problem
 1. **Harness Sandbox Boundary:** Claude Code stores plugins in `~/.claude/plugins/cache/`. When you run Claude *inside Antigravity*, Antigravity acts as the host harness. Its security policy explicitly blocks tools from reading foreign tool directories (`Permission denied: Matches default system policy`).
-2. **Snapshot Drift:** Manually copying skill folders (like Superpowers, Frontend Design, or Superdesign) into projects creates frozen snapshots that never receive upstream bugfixes or feature updates.
-3. **The Risk of Forgotten Skills:** If skills are not loaded, the AI agent falls back to generic, non-TDD behavior without threat modeling or systematic debugging.
+2. **Standalone Antigravity Environments:** Developers using Antigravity without Claude Code installed previously could not obtain the required skills because the toolchain assumed the Claude plugin CLI was available.
+3. **Snapshot Drift:** Manually copying skill folders (like Superpowers, Frontend Design, or Superdesign) into projects creates frozen snapshots that never receive upstream bugfixes or feature updates.
+4. **The Risk of Forgotten Skills:** If skills are not loaded, the AI agent falls back to generic, non-TDD behavior without threat modeling or systematic debugging.
 
 ### Machine-Enforced Skill Protection
 
-`@oneup4real/standards` provides three layers of machine enforcement to guarantee required skills are active:
+`@oneup4real/standards` provides four layers of machine enforcement to guarantee required skills are active across both Claude Code and Antigravity:
 
 ```mermaid
 graph TD
-    Cache["Claude Plugin Cache / Repos\n(~/.claude/plugins/cache/)"] -->|npx oneup-standards sync-skills| AntiGrav["Antigravity Global Roots\n(~/.gemini/config/skills/)"]
+    Sources["Skills Sources\n- Claude Plugin Cache (~/.claude/plugins/cache/)\n- Standalone Git Clone (~/.superpowers/)\n- Builtin Design Fallbacks (frontend-design, superdesign)"] -->|npx oneup-standards sync-skills / wizard| AntiGrav["Antigravity Global Roots\n(~/.gemini/config/skills/)"]
     
     subgraph "Workstation Pre-Flight Guardrails"
         SessionStart["AI Agent Starts Turn\n(Antigravity / Claude Code)"]
@@ -316,8 +317,20 @@ Section 0 of `AGENTS.global.md` instructs every AI model at the prompt level:
 - **Halt Condition:** If any core skills are missing, the agent **stops immediately** and alerts the developer:
   > ⚠️ **Required AI Skills Missing!** Run `npx oneup-standards sync-skills` in your terminal to synchronize your skills into Antigravity, then restart this conversation.
 
-#### 2. Automated Cross-Harness Synchronization (`sync-skills`)
-Synchronize all installed skills into Antigravity's global customization directory with zero manual copying:
+#### 2. Intelligent Harness Detection in Setup Wizard (`init`)
+When running `npx oneup-standards init`, the setup wizard automatically senses your environment:
+- **Claude Code detected:** Offers to install Superpowers via the Claude marketplace:
+  `claude plugin install superpowers@superpowers-marketplace`
+- **Antigravity detected (Claude Code absent):** Automatically detects Antigravity (`~/.gemini` or `.agents`), clones Superpowers directly via Git into `~/.superpowers`, and synchronizes all skills into `~/.gemini/config/skills/` — **zero dependency on Claude Code CLI**.
+- **Design Fallbacks:** Automatically provisions built-in fallbacks for `frontend-design` and `superdesign` if they are not yet present in upstream caches.
+
+#### 3. Flexible Multi-Path Synchronization (`sync-skills`)
+Synchronize skills into Antigravity with zero manual copying. `sync-skills` dynamically searches across multiple cache layouts:
+- Claude marketplace caches (`~/.claude/plugins/cache/superpowers-marketplace/**/skills`)
+- Standard plugin caches (`~/.claude/plugins/cache/**/skills`)
+- Standalone Git clone repositories (`~/.superpowers/skills`)
+- Antigravity custom roots (`~/.gemini/config/skills`)
+
 ```bash
 # Sync all skills globally for all projects opened in Antigravity:
 npx oneup-standards sync-skills
@@ -326,7 +339,7 @@ npx oneup-standards sync-skills
 npx oneup-standards sync-skills --project
 ```
 
-#### 3. Verification & Doctor Integration
+#### 4. Verification & Doctor Integration
 ```bash
 # Explicitly verify installed skills before starting work:
 npx oneup-standards check-skills
