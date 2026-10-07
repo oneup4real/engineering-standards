@@ -6,7 +6,7 @@ One source of truth for the rules every project must follow. Projects connect on
 
 ### 🎯 Primary Harness & Universal Compatibility
 
-- **Built Primarily For:** **Google Antigravity IDE** and **Claude Code CLI within Antigravity**. Antigravity is a premier harness for autonomous agentic engineering; running Claude models (Sonnet 3.7 / 3.5) inside Antigravity introduces unique host-sandbox boundaries and plugin isolation constraints. This framework was built from the ground up to automate cross-harness skill synchronization (`~/.gemini/config/skills`), manage subagent dual-control protocols, and enforce zero-forget pre-flight checks in Antigravity sessions.
+- **Built Primarily For:** **Google Antigravity IDE** and **Claude Code CLI within Antigravity**. Antigravity is a premier harness for autonomous agentic engineering; running Claude models inside Antigravity introduces unique host-sandbox boundaries and plugin isolation constraints. This framework was built from the ground up to automate cross-harness skill synchronization (`~/.gemini/config/skills`), manage subagent dual-control protocols, and enforce zero-forget pre-flight checks in Antigravity sessions.
 - **Works Seamlessly Across Other Setups:** While optimized for Antigravity, `@oneup4real/standards` is **100% harness-agnostic at its core**. It runs equally well in:
   - **Standalone Claude Code CLI** (Terminal / zsh / bash)
   - **Cursor, VS Code, & Windsurf** (via standard Git hooks, flat ESLint, TypeScript, and `AGENTS.md`)
