@@ -7,7 +7,9 @@ const AGENTS = path.join(import.meta.dirname, '..', 'agents');
 
 describe('agent rules stay in sync with the skill list', () => {
   it('every bundled skill is required', async () => {
-    for (const name of Object.keys(await discoverBundledSkills())) expect(REQUIRED_SKILLS).toContain(name);
+    const bundled = await discoverBundledSkills();
+    expect(Object.keys(bundled)).toContain('ui-consistency');
+    for (const name of Object.keys(bundled)) expect(REQUIRED_SKILLS).toContain(name);
   });
 
   it('AGENTS.global.md lists every required skill in the pre-flight', async () => {

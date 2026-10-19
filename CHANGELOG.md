@@ -11,6 +11,7 @@
 
 ### Changed
 - `sync-skills` results carry a `harness` field; updating a skill now removes files that were deleted upstream.
+- Notes: `doctor` reports the new `ui-consistency` skill as missing for Claude Code until you run `upgrade` or `sync-skills`. `styleRatchet` is opt-in (commented out in the consumer template).
 
 ## [1.5.0] - 2026-10-04
 

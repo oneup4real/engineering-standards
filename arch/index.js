@@ -142,6 +142,12 @@ export function checkStyleRatchet({ root, dirs, exclude = [], patterns, allowlis
   const allowed = readJson(root, allowlistFile, {});
   /** @type {Violation[]} */
   const violations = [];
+  if (!fs.existsSync(path.join(root, allowlistFile))) {
+    if (Object.keys(counts).length) {
+      violations.push({ file: allowlistFile, message: "baseline file missing: run `npx oneup-standards baseline` once to record today's arbitrary style values" });
+    }
+    return violations;
+  }
   for (const [file, count] of Object.entries(counts)) {
     const limit = allowed[file] ?? 0;
     if (count > limit) {

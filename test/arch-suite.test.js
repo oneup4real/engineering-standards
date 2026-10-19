@@ -31,3 +31,9 @@ it('styleRatchet reads uiStyleRatchet from .standardsrc.json', async () => {
   fs.writeFileSync(path.join(dir, '.standardsrc.json'), JSON.stringify({ uiStyleRatchet: cfg }));
   expect(resolveStyleRatchet(dir)).toEqual(cfg);
 });
+
+it('styleRatchet wraps a malformed .standardsrc.json in a readable error', async () => {
+  const dir = await tempDir();
+  fs.writeFileSync(path.join(dir, '.standardsrc.json'), '{ nope');
+  expect(() => resolveStyleRatchet(dir)).toThrow(/Could not parse \.standardsrc\.json: /);
+});

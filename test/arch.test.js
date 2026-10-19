@@ -141,8 +141,16 @@ describe('checkStyleRatchet', () => {
     ]));
   });
 
-  it('without a baseline file every arbitrary value fails', async () => {
+  it('without a baseline file one violation names the baseline command', async () => {
     const root = await project(files);
-    expect(checkStyleRatchet({ root, dirs: ['src'], allowlistFile: 'ui.json' })).toHaveLength(2);
+    const v = checkStyleRatchet({ root, dirs: ['src'], allowlistFile: 'ui.json' });
+    expect(v).toHaveLength(1);
+    expect(v[0].file).toBe('ui.json');
+    expect(v[0].message).toMatch(/baseline file missing.*npx oneup-standards baseline/);
+  });
+
+  it('a missing baseline file with no arbitrary values passes', async () => {
+    const root = await project({ 'src/a.tsx': '"text-sm"' });
+    expect(checkStyleRatchet({ root, dirs: ['src'], allowlistFile: 'ui.json' })).toEqual([]);
   });
 });

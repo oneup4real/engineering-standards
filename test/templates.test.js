@@ -75,3 +75,12 @@ describe('gitleaks in security.yml', () => {
     expect(steps[0].with['fetch-depth']).toBe(0);
   });
 });
+
+describe('consumer arch suite template', () => {
+  it('does not enable styleRatchet by default (needs uiStyleRatchet config first)', async () => {
+    const src = await fs.readFile('templates/consumer/tests/arch/standards.test.ts', 'utf8');
+    const active = src.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+    expect(active).not.toMatch(/styleRatchet/);
+    expect(src).toMatch(/\/\/\s*styleRatchet: true/);
+  });
+});

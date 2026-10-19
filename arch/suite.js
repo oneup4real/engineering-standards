@@ -23,7 +23,14 @@ import { checkServerOnly, checkForbiddenImports, checkActionGuards, checkCallRat
  */
 export function resolveStyleRatchet(root) {
   const file = path.join(root, '.standardsrc.json');
-  const cfg = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')).uiStyleRatchet : undefined;
+  let cfg;
+  if (fs.existsSync(file)) {
+    try {
+      cfg = JSON.parse(fs.readFileSync(file, 'utf8')).uiStyleRatchet;
+    } catch (err) {
+      throw new Error(`Could not parse .standardsrc.json: ${/** @type {Error} */ (err).message}`, { cause: err });
+    }
+  }
   if (!cfg?.dirs?.length || !cfg.allowlistFile) {
     throw new Error('styleRatchet is on but "uiStyleRatchet": { "dirs": [...], "allowlistFile": "..." } is missing in .standardsrc.json');
   }
