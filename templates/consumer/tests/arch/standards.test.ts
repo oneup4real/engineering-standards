@@ -24,4 +24,6 @@ defineArchSuite({
     callPattern: 'addDoc|setDoc|updateDoc|deleteDoc|writeBatch|runTransaction',
     allowlistFile: 'arch-allowlist.json',
   },
+  // Needs "uiStyleRatchet" in .standardsrc.json; run `npx oneup-standards baseline` once to record today's values.
+  styleRatchet: true,
 });

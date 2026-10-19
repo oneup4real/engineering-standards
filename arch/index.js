@@ -107,6 +107,57 @@ export function checkCallRatchet({ root, dirs, exclude = [], callPattern, allowl
   return violations;
 }
 
+/** Tailwind arbitrary values that bypass design tokens. `var(--token)` values are allowed. */
+export const ARBITRARY_STYLE_PATTERNS = [
+  String.raw`\btext-\[\d+(?:\.\d+)?(?:px|rem|em)\]`,
+  String.raw`\brounded(?:-[trblse]{1,2})?-\[[^\]v][^\]]*\]`,
+  String.raw`\b-?(?:p|px|py|pt|pr|pb|pl|m|mx|my|mt|mr|mb|ml|gap|gap-x|gap-y|space-x|space-y)-\[\d+(?:\.\d+)?(?:px|rem|em)\]`,
+  String.raw`\b(?:bg|text|border|ring|fill|stroke|from|via|to|outline|shadow)-\[#[0-9a-fA-F]{3,8}\]`,
+];
+
+/**
+ * Counts arbitrary style values per file (only files with at least one).
+ * @param {{ root: string, dirs: string[], exclude?: string[], patterns?: string[] }} opts
+ * @returns {Record<string, number>}
+ */
+export function countArbitraryStyles({ root, dirs, exclude = [], patterns = ARBITRARY_STYLE_PATTERNS }) {
+  const regex = new RegExp(patterns.join('|'), 'g');
+  /** @type {Record<string, number>} */
+  const counts = {};
+  for (const file of sourceFiles(root, dirs, exclude)) {
+    const count = (read(root, file).match(regex) ?? []).length;
+    if (count > 0) counts[file] = count;
+  }
+  return counts;
+}
+
+/**
+ * Arbitrary style values per file may only shrink against the baseline file.
+ * @param {{ root: string, dirs: string[], exclude?: string[], patterns?: string[], allowlistFile: string }} opts
+ * @returns {Violation[]}
+ */
+export function checkStyleRatchet({ root, dirs, exclude = [], patterns, allowlistFile }) {
+  const counts = countArbitraryStyles({ root, dirs, exclude, patterns });
+  /** @type {Record<string, number>} */
+  const allowed = readJson(root, allowlistFile, {});
+  /** @type {Violation[]} */
+  const violations = [];
+  for (const [file, count] of Object.entries(counts)) {
+    const limit = allowed[file] ?? 0;
+    if (count > limit) {
+      violations.push({ file, message: `${count} arbitrary style value(s), allowed ${limit}. Use design tokens or a primitive from the UI catalog.` });
+    } else if (count < limit) {
+      violations.push({ file, message: `only ${count} arbitrary style value(s) left but ${limit} allowed: shrink the entry in ${allowlistFile} to ${count}.` });
+    }
+  }
+  for (const [file, limit] of Object.entries(allowed)) {
+    if (!(file in counts) && limit > 0) {
+      violations.push({ file, message: `file no longer has arbitrary style values (or was removed): delete its entry from ${allowlistFile}.` });
+    }
+  }
+  return violations;
+}
+
 /**
  * All sources must contain exactly the same values. The first source is the reference.
  * @param {{ label: string, values: string[] }[]} sources

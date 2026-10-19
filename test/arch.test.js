@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { checkServerOnly, checkForbiddenImports, checkActionGuards, checkCallRatchet, checkSetsInSync } from '../arch/index.js';
+import { checkServerOnly, checkForbiddenImports, checkActionGuards, checkCallRatchet, checkSetsInSync, countArbitraryStyles, checkStyleRatchet } from '../arch/index.js';
 import { tempDir } from './helpers.js';
 
 async function project(files) {
@@ -103,5 +103,46 @@ describe('checkSetsInSync', () => {
 
   it('identical sets pass', () => {
     expect(checkSetsInSync([{ label: 'a', values: ['x', 'y'] }, { label: 'b', values: ['y', 'x'] }])).toEqual([]);
+  });
+});
+
+describe('countArbitraryStyles', () => {
+  it('counts arbitrary sizes, radii, spacing and hex colors including variant prefixes', async () => {
+    const root = await project({
+      'src/components/A.tsx': `<span className="text-[11px] md:text-[10.5px] hover:rounded-[18px] px-[13px] bg-[#0062e0]" />`,
+      'src/components/B.tsx': `<span className="text-sm rounded-xl p-4 bg-primary text-[var(--x)] w-[200px]" />`,
+      'src/components/ui/Pill.tsx': `<span className="text-[10px]" />`,
+    });
+    expect(countArbitraryStyles({ root, dirs: ['src'], exclude: ['src/components/ui/'] })).toEqual({ 'src/components/A.tsx': 5 });
+  });
+});
+
+describe('checkStyleRatchet', () => {
+  const files = { 'src/a.tsx': '"text-[11px] text-[12px]"', 'src/b.tsx': '"rounded-[9px]"' };
+
+  it('passes when counts equal the baseline', async () => {
+    const root = await project({ ...files, 'ui.json': JSON.stringify({ 'src/a.tsx': 2, 'src/b.tsx': 1 }) });
+    expect(checkStyleRatchet({ root, dirs: ['src'], allowlistFile: 'ui.json' })).toEqual([]);
+  });
+
+  it('fails on an increase and on a new file', async () => {
+    const root = await project({ ...files, 'ui.json': JSON.stringify({ 'src/a.tsx': 1 }) });
+    const v = checkStyleRatchet({ root, dirs: ['src'], allowlistFile: 'ui.json' });
+    expect(v.map((x) => x.file).sort()).toEqual(['src/a.tsx', 'src/b.tsx']);
+    expect(v[0].message).toMatch(/design tokens|primitive/);
+  });
+
+  it('asks to shrink the baseline when counts went down', async () => {
+    const root = await project({ ...files, 'ui.json': JSON.stringify({ 'src/a.tsx': 5, 'src/b.tsx': 1, 'src/gone.tsx': 2 }) });
+    const v = checkStyleRatchet({ root, dirs: ['src'], allowlistFile: 'ui.json' });
+    expect(v).toEqual(expect.arrayContaining([
+      expect.objectContaining({ file: 'src/a.tsx', message: expect.stringMatching(/shrink/) }),
+      expect.objectContaining({ file: 'src/gone.tsx', message: expect.stringMatching(/delete its entry/) }),
+    ]));
+  });
+
+  it('without a baseline file every arbitrary value fails', async () => {
+    const root = await project(files);
+    expect(checkStyleRatchet({ root, dirs: ['src'], allowlistFile: 'ui.json' })).toHaveLength(2);
   });
 });

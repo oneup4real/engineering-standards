@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { defineArchSuite } from '../arch/suite.js';
+import { it, expect } from 'vitest';
+import { defineArchSuite, resolveStyleRatchet } from '../arch/suite.js';
+import { tempDir } from './helpers.js';
 
 // A clean project: every registered check must pass.
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'oneup-suite-'));
@@ -16,4 +18,16 @@ defineArchSuite({
   actionGuards: { guardPattern: 'requireAuth' },
   writeRatchet: { dirs: ['src/app'], exclude: ['src/app/actions/'], callPattern: 'setDoc', allowlistFile: 'allow.json' },
   setsInSync: [{ name: 'roles', sources: () => [{ label: 'a', values: ['x'] }, { label: 'b', values: ['x'] }] }],
+});
+
+it('styleRatchet without config explains what to add', async () => {
+  const dir = await tempDir();
+  expect(() => resolveStyleRatchet(dir)).toThrow(/uiStyleRatchet.*\.standardsrc\.json/);
+});
+
+it('styleRatchet reads uiStyleRatchet from .standardsrc.json', async () => {
+  const dir = await tempDir();
+  const cfg = { dirs: ['src'], exclude: ['src/components/ui/'], allowlistFile: 'ui-style-baseline.json' };
+  fs.writeFileSync(path.join(dir, '.standardsrc.json'), JSON.stringify({ uiStyleRatchet: cfg }));
+  expect(resolveStyleRatchet(dir)).toEqual(cfg);
 });
