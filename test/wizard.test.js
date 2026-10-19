@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs/promises';
+import { mkdtempSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { runWizard } from '../lib/wizard.js';
 import { makeIo, tempDir } from './helpers.js';
@@ -18,6 +20,8 @@ function deps({ answers = {}, installed = ['gitleaks', 'gh'], failing = [] } = {
   return {
     prompts,
     calls,
+    // Own empty home per wizard run; tests that need a prepared home override it.
+    homeDir: mkdtempSync(path.join(os.tmpdir(), 'oneup-wizard-home-')),
     prompt: async (q) => {
       prompts.push(q);
       return q.id in answers ? answers[q.id] : q.default;
