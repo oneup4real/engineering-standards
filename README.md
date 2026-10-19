@@ -17,6 +17,7 @@ One source of truth for the rules every project must follow. Projects connect on
 3. [Tools Used & Risk Mitigation Matrix](#3-tools-used--risk-mitigation-matrix)
     - [Defense-in-Depth: SAST vs. Linting vs. Testing](#defense-in-depth-sast-vs-linting-vs-testing)
 4. [Architectural Guardrails & Threat Boundaries](#4-architectural-guardrails--threat-boundaries)
+    - [UI Consistency Guardrails](#ui-consistency-guardrails)
 5. [Subagent Dual-Control Protocol](#5-subagent-dual-control-protocol)
 6. [Cross-Harness AI Skill Governance (Antigravity & Claude Code)](#6-cross-harness-ai-skill-governance-antigravity--claude-code)
 7. [Quickstart: New Projects](#7-quickstart-new-projects)
@@ -153,6 +154,7 @@ Every tool incorporated into `@oneup4real/standards` is targeted at specific rea
 | **`@oneup4real/standards/firebase-testing`** | Testing (CI Emulated) | Database security rules regressions; unauthorized role privilege escalation in Firestore. | **Authorization Testing**: Automated test runner against local emulator for allowed & denied cases. |
 | **`@oneup4real/standards/next/headers`** | Release & Deployment | Clickjacking, MIME sniffing, cross-site scripting (XSS), missing HSTS/CSP. | **Runtime Defense**: Injects hardened production HTTP security headers. |
 | **`doctor` & `upgrade`** | Operations & Fleet | Configuration drift: projects initialized months ago missing new security patches and hook updates. | **Fleet Consistency**: Cryptographically tracks template drift and provides safe upgrades. |
+| **`ui-consistency` skill + style ratchet** | Design & Coding | AI styles each screen in isolation: one-off font sizes (`text-[10.5px]`), hand-built pills and modals next to existing primitives, drifting spacing and radii. | **UI Integrity**: Primitives are reused, tokens are enforced, and arbitrary style values can only decrease. |
 | **Superpowers Subagent Dual-Control** | Design & Coding | Single agent "cheating" its own evaluation, hallucinating test results, or deviating from plan. | **Four-Eyes Governance**: Separates the implementer agent from an independent, fresh-context reviewer agent. |
 
 ### Defense-in-Depth: SAST vs. Linting vs. Testing
@@ -233,6 +235,89 @@ graph TD
      | { success: false; error: string; code?: string };
    ```
 
+### UI Consistency Guardrails
+
+AI agents build UI one screen at a time. Without guardrails, each screen picks its own font sizes, spacing and
+"almost the same" pill or card, and the app slowly stops looking like one product. The standard treats the
+presentation layer like the server layers: a fixed structure, written rules, and an automated check.
+
+```mermaid
+graph TD
+    Tokens["1. Design tokens\n@theme: colors, type scale, radii, spacing"]
+    Primitives["2. Primitives\nsrc/components/ui/: Button, Pill, Card, Modal, SectionHeader …\n(typed variants, the only place raw styling lives)"]
+    Features["3. Feature components\nsrc/components/&lt;feature&gt;/: compose primitives, pass variants"]
+    Pages["4. Pages\nsrc/app/: layout and data loading"]
+
+    Tokens --> Primitives --> Features --> Pages
+    Features -.->|FORBIDDEN: arbitrary values, hand-built primitives| Tokens
+```
+
+| Layer | Owns | Rule |
+|---|---|---|
+| **Tokens** (`@theme` in `globals.css`) | Color roles, type scale (`text-label`, `text-body`, `text-title` …), radii, spacing | Missing a step? Add a token. Never an arbitrary value. |
+| **Primitives** (`src/components/ui/`) | Look and behaviour of reusable building blocks, with typed variants (`variant`, `size`, `tone`) | The only folder allowed to use raw styling. Exported from `ui/index.ts`. Listed in the catalog. |
+| **Feature components** | Domain UI (ticket card, booking sheet) | Compose primitives. Extend a primitive with a variant instead of copying it. |
+| **Pages** | Routing, data loading, layout | No styling decisions beyond layout. |
+
+**Reference stack for primitives** (full examples in `skills/ui-consistency/references/react-primitives.md`):
+
+| Concern | Standard |
+|---|---|
+| Variants | `cva` (class-variance-authority) with typed `variant` / `size` props |
+| Class merging | One `cn()` helper (`clsx` + `tailwind-merge`, extended with the project's custom tokens) |
+| Interactive parts | Recommended: Radix UI (or React Aria) for dialog, popover, dropdown, tabs, select (focus trap, ESC, ARIA included). Allowed: the project's own implementation, as exactly one primitive per kind, documented in the UI catalog |
+| Composition | `children`, compound components (`Card.Header`), `asChild` for polymorphic rendering |
+| Tokens | Named by role (`text-label`, `bg-status-success`), raw values only in `@theme` |
+| Outside `className` | Layout only; look comes from variants |
+
+This is the shadcn/ui approach: the primitives live in the project's own repository and are owned and
+changed there. They are not an external component library.
+
+**Refactoring existing UI without visual change.** Moving an existing app onto this structure must not change
+how it looks:
+
+1. Freeze every screen with visual regression screenshots (Playwright `toHaveScreenshot`, seeded data,
+   fixed viewport, animations off) **before** the first refactor.
+2. Introduce tokens with exactly today's values (1:1). Merging similar values is a separate design decision.
+3. Migrate one primitive at a time across all usages. Zero pixel diff, then commit.
+4. A diff means the refactor is wrong. Snapshots are only updated with the human's explicit approval.
+
+**Three enforcement layers**, the same pattern as the security rules:
+
+1. **Prompt level:** `AGENTS.global.md` requires the `ui-consistency` skill. Before writing UI, the agent reads the
+   project's UI catalog and primitives and puts a *reuse table* (element → primitive) in its plan. The reviewer
+   subagent checks UI changes against the catalog. `frontend-design` is reserved for new products and redesigns
+   the human asked for.
+2. **Project level:** each project documents its primitives folder, catalog (`docs/UI_GUIDELINES.md`) and token
+   scale in the "UI catalog" section of its `AGENTS.md`.
+3. **CI level:** the style ratchet (`checkStyleRatchet`) counts arbitrary Tailwind values outside the primitives
+   folder: `text-[11px]`, `rounded-[18px]`, `p-[13px]`, `bg-[#0062e0]`. `var(--token)` values and widths/heights are
+   not counted. Counts are frozen once by the human and may only go down (see Appendix C).
+
+**Enable the style ratchet in a project:**
+
+```json
+// .standardsrc.json
+{
+  "uiStyleRatchet": {
+    "dirs": ["src/app", "src/components"],
+    "exclude": ["src/components/ui/"],
+    "allowlistFile": "ui-style-baseline.json"
+  }
+}
+```
+
+```ts
+// tests/arch/standards.test.ts
+defineArchSuite({
+  root: path.resolve(import.meta.dirname, '../..'),
+  // …existing options
+  styleRatchet: true,
+});
+```
+
+Then the human runs `npx oneup-standards baseline` once and commits `ui-style-baseline.json`.
+
 ---
 
 ## 5. Subagent Dual-Control Protocol
@@ -297,6 +382,8 @@ Modern engineering teams often switch between **Claude Code CLI** and **Google A
 ```mermaid
 graph TD
     Cache["Claude Plugin Cache / Repos\n(~/.claude/plugins/cache/)"] -->|npx oneup-standards sync-skills| AntiGrav["Antigravity Global Roots\n(~/.gemini/config/skills/)"]
+    Bundled["Package skills\n(@oneup4real/standards/skills)"] -->|sync-skills| AntiGrav
+    Bundled -->|sync-skills| Claude["Claude Code skills\n(~/.claude/skills/ or .claude/skills/)"]
     
     subgraph "Workstation Pre-Flight Guardrails"
         SessionStart["AI Agent Starts Turn\n(Antigravity / Claude Code)"]
@@ -312,12 +399,12 @@ graph TD
 
 #### 1. Zero-Forget AI Pre-Flight Gate (`AGENTS.global.md`)
 Section 0 of `AGENTS.global.md` instructs every AI model at the prompt level:
-- Before writing code, the agent MUST verify that essential skills (`brainstorming`, `writing-plans`, `executing-plans`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `requesting-code-review`, `frontend-design`, `superdesign`) are loaded in its context.
+- Before writing code, the agent MUST verify that essential skills (`brainstorming`, `writing-plans`, `executing-plans`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `requesting-code-review`, `frontend-design`, `superdesign`, `ui-consistency`) are loaded in its context.
 - **Halt Condition:** If any core skills are missing, the agent **stops immediately** and alerts the developer:
   > ⚠️ **Required AI Skills Missing!** Run `npx oneup-standards sync-skills` in your terminal to synchronize your skills into Antigravity, then restart this conversation.
 
 #### 2. Automated Cross-Harness Synchronization (`sync-skills`)
-Synchronize all installed skills into Antigravity's global customization directory with zero manual copying:
+Synchronize all installed skills into Antigravity's global customization directory with zero manual copying. `sync-skills` also installs the package's own skills for Claude Code (`~/.claude/skills`, or `.claude/skills` with `--project`):
 ```bash
 # Sync all skills globally for all projects opened in Antigravity:
 npx oneup-standards sync-skills
@@ -334,6 +421,12 @@ npx oneup-standards check-skills
 # Doctor checks your Antigravity skills directory during routine audits:
 npx oneup-standards doctor
 ```
+
+#### 4. Standard-Owned Skills
+Some skills belong to the standard itself and ship inside `@oneup4real/standards` (`skills/`), currently
+`ui-consistency`. They are versioned with the package, override any plugin skill with the same name, and are
+installed for both Antigravity and Claude Code by `sync-skills`. `doctor` reports them as missing or outdated
+after a package upgrade; `upgrade` or `sync-skills` refreshes them.
 
 ---
 
@@ -530,9 +623,9 @@ All commands are available via `npx oneup-standards <command>`:
 | `init` | `[--yes]` | Interactive setup wizard for new or existing projects (`--yes` accepts recommended answers). |
 | `doctor` | `[--warn-only]` | Diagnoses configuration drift, missing hooks, outdated templates, AI skills, and displays active monotonic ratchets / technical debt. |
 | `upgrade` | `[--merge] [--force] [--dry-run]` | Safely synchronizes template files, hooks, and AI rules. Uses `--merge` to combine customized files, or `--force` to replace. |
-| `sync-skills` | `[--project] [--dry-run]` | Discovers and synchronizes AI skills (`superpowers`, `frontend-design`, `superdesign`, etc.) into Antigravity (`~/.gemini/config/skills`). |
+| `sync-skills` | `[--project] [--dry-run]` | Synchronizes plugin skills (`superpowers`, `frontend-design`, `superdesign`, …) into Antigravity (`~/.gemini/config/skills`) and installs the package's own skills (`ui-consistency`) for Antigravity and Claude Code (`~/.claude/skills`). |
 | `check-skills` | none | Verifies required AI skills (`test-driven-development`, `brainstorming`, `superdesign`, etc.) are installed in Antigravity. |
-| `baseline` | none | Generates `.dependency-cruiser-known-violations.json` and `.eslint-suppressions.json` to freeze existing architectural and lint violations into monotonic ratchets. |
+| `baseline` | none | Generates `.dependency-cruiser-known-violations.json`, `.eslint-suppressions.json` and, when `uiStyleRatchet` is configured, the UI style baseline, freezing existing violations into monotonic ratchets. |
 | `sync-agents` | `[--global]` | Refreshes managed shared rules in `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` (`--global` updates `~/.agents/AGENTS.md`). |
 | `check-files` | `[paths...]` | Fails if specified paths (default: staged files) contain office docs, keys, or `.env` files. |
 | `check-bundle` | `[--dir <path>]` | Scans production JavaScript bundles for confidential markers configured in `.standardsrc.json`. |
@@ -555,7 +648,8 @@ Projects consuming `@oneup4real/standards` can import standard presets directly:
 | `@oneup4real/standards/tsconfig/base.json` | TSConfig | Strict base TypeScript settings (`noImplicitAny`, `strictNullChecks`). |
 | `@oneup4real/standards/depcruise/layered` | Dependency Cruiser | Clean Architecture layer dependency validation rules. |
 | `@oneup4real/standards/vitest` | Vitest Config | Preset configuring coverage thresholds (≥90% domain coverage) and reporting. |
-| `@oneup4real/standards/arch/suite` | Arch Test Kit | `defineArchSuite()`: Automates checks for `server-only`, Action guards, and write ratchets. |
+| `@oneup4real/standards/arch/suite` | Arch Test Kit | `defineArchSuite()`: Automates checks for `server-only`, Action guards, write ratchets and the UI style ratchet (`styleRatchet: true`). |
+| `@oneup4real/standards/arch` | Arch Checkers | Pure checkers (`checkServerOnly`, `checkActionGuards`, `checkCallRatchet`, `checkStyleRatchet`, `countArbitraryStyles`) for custom test setups. |
 | `@oneup4real/standards/firebase-testing` | Test Helpers | Firebase emulator testing utilities (`assertEmulator`, `createRulesEnv`, `withRoles`). |
 | `@oneup4real/standards/next/headers` | Next Config | Production security headers (`securityHeaders({ firebase: true })`) including CSP, HSTS, and XFO. |
 
@@ -645,7 +739,7 @@ flowchart TD
 
 ---
 
-#### 1. The Four Framework Ratchets
+#### 1. The Framework Ratchets
 
 | Ratchet Type | Baseline File | Scope & Risk Mitigated | Creation Command | Paydown / Pruning Command |
 |---|---|---|---|---|
@@ -653,6 +747,7 @@ flowchart TD
 | **Architecture Layers** | `.dependency-cruiser-known-violations.json` | Cross-layer import leaks (e.g. UI importing DB adapters directly instead of Server Actions). | `npx oneup-standards baseline` | Refactor imports, then run `npx oneup-standards baseline` |
 | **Direct DB Writes** | `arch-allowlist.json` | Direct client-side Firestore/database mutations (`addDoc`, `setDoc`) bypassing backend validation. | `arch/suite.js` template | Move write to Server Action/Service, then decrement count in `arch-allowlist.json` |
 | **Server Action Guards** | `arch-action-gaps.json` | Exported server actions lacking authentication checks or explicit `@public-action` audit comments. | `arch/suite.js` template | Add `requireAuth()` or `@public-action` comment, then remove entry from file |
+| **UI Style Values** | `ui-style-baseline.json` (name configurable via `uiStyleRatchet.allowlistFile`) | Arbitrary UI style values per file outside the primitives folder. | `npx oneup-standards baseline` | Replace the value with a token or primitive variant, then run `npx oneup-standards baseline` |
 
 ---
 
