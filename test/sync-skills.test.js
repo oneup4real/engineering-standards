@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { discoverSkills, syncSkills, checkMissingSkills, REQUIRED_SKILLS } from '../lib/sync-skills.js';
+import { discoverSkills, syncSkills, checkMissingSkills, REQUIRED_SKILLS, BUNDLED_SKILLS_DIR, discoverBundledSkills } from '../lib/sync-skills.js';
 
 describe('sync-skills', () => {
   it('discovers skills across plugins in cache', async () => {
@@ -21,7 +21,7 @@ describe('sync-skills', () => {
     await fs.mkdir(fdDir, { recursive: true });
     await fs.writeFile(path.join(fdDir, 'SKILL.md'), '---\nname: frontend-design\n---\n# Design');
 
-    const discovered = await discoverSkills({ cacheDir });
+    const discovered = await discoverSkills({ cacheDir, bundledDir: path.join(tmp, 'no-bundled') });
     expect(Object.keys(discovered).sort()).toEqual(['brainstorming', 'frontend-design', 'test-driven-development']);
     expect(discovered.brainstorming).toBe(path.join(spDir, 'brainstorming'));
     expect(discovered['frontend-design']).toBe(fdDir);
@@ -37,7 +37,7 @@ describe('sync-skills', () => {
     await fs.writeFile(path.join(skillSource, 'references', 'REF.md'), '# Ref content');
 
     const homeDir = path.join(tmp, 'home');
-    const results = await syncSkills({ homeDir, cacheDir });
+    const results = await syncSkills({ homeDir, cacheDir, bundledDir: path.join(tmp, 'no-bundled') });
 
     const targetSkill = path.join(homeDir, '.gemini', 'config', 'skills', 'superdesign');
     expect(await fs.readFile(path.join(targetSkill, 'SKILL.md'), 'utf8')).toBe('# Superdesign');
@@ -48,7 +48,7 @@ describe('sync-skills', () => {
     expect(results[0].action).toBe('created');
 
     // Second run should be unchanged
-    const secondResults = await syncSkills({ homeDir, cacheDir });
+    const secondResults = await syncSkills({ homeDir, cacheDir, bundledDir: path.join(tmp, 'no-bundled') });
     expect(secondResults[0].action).toBe('unchanged');
   });
 
@@ -57,7 +57,7 @@ describe('sync-skills', () => {
     const homeDir = path.join(tmp, 'home');
     const cacheDir = path.join(tmp, 'nonexistent');
 
-    const results = await syncSkills({ homeDir, cacheDir });
+    const results = await syncSkills({ homeDir, cacheDir, bundledDir: path.join(tmp, 'no-bundled') });
     expect(results).toEqual([]);
   });
 
@@ -152,3 +152,33 @@ describe('sync-skills', () => {
 });
 
 
+
+describe('bundled skills', () => {
+  it('ships ui-consistency inside the package', async () => {
+    const found = await discoverBundledSkills();
+    expect(found['ui-consistency']).toBe(path.join(BUNDLED_SKILLS_DIR, 'ui-consistency'));
+    const text = await fs.readFile(path.join(found['ui-consistency'], 'SKILL.md'), 'utf8');
+    expect(text).toMatch(/^---\nname: ui-consistency\ndescription: .+\n---/);
+    const ref = await fs.readFile(path.join(found['ui-consistency'], 'references', 'react-primitives.md'), 'utf8');
+    expect(ref).toMatch(/extendTailwindMerge/);
+    expect(text).toMatch(/references\/react-primitives\.md/);
+  });
+
+  it('bundled skills override a plugin skill with the same name', async () => {
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'standards-skills-'));
+    const cacheDir = path.join(tmp, 'cache');
+    const pluginCopy = path.join(cacheDir, 'evil', '1.0.0', 'skills', 'ui-consistency');
+    await fs.mkdir(pluginCopy, { recursive: true });
+    await fs.writeFile(path.join(pluginCopy, 'SKILL.md'), '# not ours');
+    const bundledDir = path.join(tmp, 'bundled');
+    await fs.mkdir(path.join(bundledDir, 'ui-consistency'), { recursive: true });
+    await fs.writeFile(path.join(bundledDir, 'ui-consistency', 'SKILL.md'), '# ours');
+
+    const discovered = await discoverSkills({ cacheDir, bundledDir });
+    expect(discovered['ui-consistency']).toBe(path.join(bundledDir, 'ui-consistency'));
+  });
+
+  it('a missing bundled dir yields no bundled skills', async () => {
+    expect(await discoverBundledSkills({ bundledDir: '/nonexistent/skills' })).toEqual({});
+  });
+});
