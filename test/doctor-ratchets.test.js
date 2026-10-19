@@ -93,4 +93,12 @@ describe("inspectRatchets and doctor ratchets reporting", () => {
     expect(io.out).toContain(".eslint-suppressions.json");
     expect(io.out).toContain("3 violations across 1 file");
   });
+
+  it("shows the UI style ratchet", async () => {
+    const dir = await tempDir();
+    await fs.writeFile(path.join(dir, "ui-style-baseline.json"), JSON.stringify({ "src/a.tsx": 3, "src/b.tsx": 2 }));
+    const config = { uiStyleRatchet: { dirs: ["src"], allowlistFile: "ui-style-baseline.json" } };
+    const ratchets = await inspectRatchets(dir, config);
+    expect(ratchets).toContainEqual(expect.objectContaining({ id: "ui-styles", count: 5, details: "5 arbitrary style values across 2 files" }));
+  });
 });

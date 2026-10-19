@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.6.0] - 2026-10-19
+
+### Added
+- **`ui-consistency` skill** shipped in the package (`skills/`). `sync-skills` installs package skills for Claude Code (`~/.claude/skills`, or `.claude/skills` with `--project`) and Antigravity; bundled skills override plugin skills with the same name.
+- Reference stack for React primitives (`cva`, `cn()` with `tailwind-merge`, Radix UI, compound components, role-named tokens) and a visual-regression workflow for refactoring existing UI without visual change (`skills/ui-consistency/references/react-primitives.md`, README §4).
+- `doctor` reports missing or outdated standard skills for Claude Code (`claude-skills`).
+- `AGENTS.global.md`: `ui-consistency` in the pre-flight, "Reuse UI before building UI" rule, UI check for the reviewer. `AGENTS.project.md`: "UI catalog" section.
+- **UI style ratchet**: `checkStyleRatchet` / `styleRatchet` suite option counts arbitrary Tailwind values (`text-[11px]`, `rounded-[18px]`, `p-[13px]`, `bg-[#hex]`) outside the primitives folder; `baseline` records them from `uiStyleRatchet` in `.standardsrc.json`; `doctor` shows the count.
+
+### Changed
+- `sync-skills` results carry a `harness` field; updating a skill now removes files that were deleted upstream.
+- Notes: `doctor` reports the new `ui-consistency` skill as missing for Claude Code until you run `upgrade` or `sync-skills`. `styleRatchet` is opt-in (commented out in the consumer template).
+
 ## [1.5.0] - 2026-10-04
 
 ### Added

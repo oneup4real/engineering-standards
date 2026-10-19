@@ -17,13 +17,16 @@ Check whether the required AI skills are loaded in your context:
 - `requesting-code-review`
 - `frontend-design`
 - `superdesign`
+- `ui-consistency`
 
 **HALT IF SKILLS ARE MISSING:**
 If any core skills (`brainstorming`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`) are missing from your available skills, you MUST stop immediately before editing any code and alert the user:
 > ⚠️ **Required AI Skills Missing!**
 > The following skills are missing from this session: [list missing skills].
-> Please run `npx oneup-standards sync-skills` in your terminal to synchronize your skills into Antigravity (`~/.gemini/config/skills/`), then restart this conversation.
+> Please run `npx oneup-standards sync-skills` in your terminal to synchronize your skills into Antigravity (`~/.gemini/config/skills/`) and Claude Code (`~/.claude/skills/`), then restart this conversation.
 > You must not proceed to write code without these skills active.
+
+If the task touches UI and `ui-consistency` is missing, halt the same way.
 
 ## 1. How to work: Subagent Dual-Control Protocol
 
@@ -44,6 +47,7 @@ Every non-trivial task (more than a single 5-line edit) MUST follow this structu
      - Verifies code against the original spec and layer architecture rules.
      - Runs `npx tsc --noEmit` and the relevant test suite directly.
      - Checks for regressions, drift, untyped `any`, and missing tests.
+     - Checks UI changes against the project's UI catalog: primitives reused, no arbitrary style values outside the primitives folder, no duplicated components.
    - If the Reviewer finds gaps, dispatch a **Scoped Fix & Re-Review** cycle until green.
    - ONLY after the Reviewer approves may the main orchestrator advance to the next step.
 
@@ -57,6 +61,8 @@ Every non-trivial task (more than a single 5-line edit) MUST follow this structu
    - **Debug systematically.** Prove root cause before editing code.
    - **Verify before claiming done.** "Should work" is never accepted.
    - **Do only the task you were given.** No unrelated refactoring.
+   - **Reuse UI before building UI.** Before writing UI, follow `ui-consistency`: read the project's UI catalog and primitives folder, and put a reuse table in the plan. Use design tokens, never arbitrary values (`text-[11px]`, `rounded-[18px]`). New primitives go into the primitives folder and the catalog, built with the reference stack (`cva` variants, `cn()` with `tailwind-merge`; for interactive parts Radix UI or the project's own single implementation in the primitives folder). Use `frontend-design` only for new products or redesigns the human asked for.
+   - **Refactor UI only behind a visual baseline.** Moving existing screens onto primitives or tokens must not change how they look: screenshot baseline first, zero pixel diff after, and never update snapshots without the human's approval.
 
 If Superpowers skills are available, always activate: `brainstorming`, `writing-plans`, `executing-plans`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `requesting-code-review`.
 

@@ -54,4 +54,22 @@ describe("baseline command and writeBaseline", () => {
     expect(code).toBe(0);
     expect(io.out).toContain("No baselineable tools found");
   });
+  it("writes the UI style baseline when uiStyleRatchet is configured", async () => {
+    const dir = await tempDir();
+    await fs.mkdir(path.join(dir, "src", "components", "ui"), { recursive: true });
+    await fs.writeFile(path.join(dir, "src", "components", "A.tsx"), '"text-[11px] rounded-[18px]"');
+    await fs.writeFile(path.join(dir, "src", "components", "ui", "P.tsx"), '"text-[10px]"');
+    await fs.writeFile(path.join(dir, ".standardsrc.json"), JSON.stringify({
+      uiStyleRatchet: { dirs: ["src"], exclude: ["src/components/ui/"], allowlistFile: "ui-style-baseline.json" },
+    }));
+    const result = await writeBaseline({ targetDir: dir, exec: async () => ({ code: 0 }) });
+    expect(result.uiStyles).toEqual({ code: 0, file: "ui-style-baseline.json", count: 2 });
+    expect(JSON.parse(await fs.readFile(path.join(dir, "ui-style-baseline.json"), "utf8"))).toEqual({ "src/components/A.tsx": 2 });
+  });
+
+  it("leaves uiStyles null without config", async () => {
+    const dir = await tempDir();
+    const result = await writeBaseline({ targetDir: dir, exec: async () => ({ code: 0 }) });
+    expect(result.uiStyles).toBeNull();
+  });
 });
