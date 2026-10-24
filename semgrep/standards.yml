@@ -1,0 +1,74 @@
+# Semgrep rules of @oneup4real/standards. Not covered by ESLint (eslint/security.js) or the arch suite.
+# Used by: security.yml (CI, semgrep job), `oneup-standards hook pre-commit` (staged files, when semgrep is installed).
+# A project can override the set with its own .semgrep/standards.yml.
+# Suppress a reviewed finding on the line above it with: // nosemgrep: <rule id> - <reason>
+# Fixtures: standards.tsx next to this file (run `semgrep --test` here).
+rules:
+  - id: standards.unsanitized-html-sink
+    message: >-
+      Assigning a dynamic value to innerHTML/outerHTML or calling document.write/insertAdjacentHTML writes
+      unsanitized HTML (XSS). Use textContent, or sanitize the value first.
+    severity: ERROR
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      owasp: ["A03:2021 Injection"]
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: '$EL.innerHTML = $X'
+          - pattern: '$EL.outerHTML = $X'
+          - pattern: 'document.write($X)'
+          - pattern: 'document.writeln($X)'
+          - pattern: '$EL.insertAdjacentHTML($POS, $X)'
+      - pattern-not: '$EL.innerHTML = "..."'
+      - pattern-not: '$EL.outerHTML = "..."'
+      - pattern-not: 'document.write("...")'
+      - pattern-not: 'document.writeln("...")'
+      - pattern-not: '$EL.insertAdjacentHTML($POS, "...")'
+      - pattern-not: '$EL.innerHTML = DOMPurify.sanitize(...)'
+      - pattern-not: '$EL.insertAdjacentHTML($POS, DOMPurify.sanitize(...))'
+
+  - id: standards.insecure-random-for-secret
+    message: >-
+      Math.random() is not cryptographically secure. Do not use it for tokens, passwords, codes, nonces or
+      session ids. Use crypto.randomBytes / crypto.randomUUID / crypto.getRandomValues.
+    severity: ERROR
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      owasp: ["A02:2021 Cryptographic Failures"]
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: 'const $VAR = <... Math.random() ...>'
+          - pattern: 'let $VAR = <... Math.random() ...>'
+          - pattern: '$VAR = <... Math.random() ...>'
+          - pattern: '$OBJ.$VAR = <... Math.random() ...>'
+          - pattern: |
+              { ..., $VAR: <... Math.random() ...>, ... }
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: (?i).*(token|secret|passw|nonce|otp|apikey|api_key|session|csrf|salt|credential|resetcode|pin|signature).*
+
+  - id: standards.server-action-error-message-passthrough
+    message: >-
+      A server action returns the caught error's message to the client. Internal messages leak stack, SQL,
+      paths or rule names. Log the error server-side and return a fixed, user-safe message with a code.
+    severity: WARNING
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      owasp: ["A04:2021 Insecure Design", "API8:2023 Security Misconfiguration"]
+      confidence: MEDIUM
+    patterns:
+      - pattern-inside: |
+          "use server"
+          ...
+      - pattern-inside: |
+          catch ($E) { ... }
+      - pattern-either:
+          - pattern: 'return {..., $K: $E.message, ...}'
+          - pattern: 'return {..., $K: String($E), ...}'
+          - pattern: 'return {..., $K: `...${$E.message}...`, ...}'
+          - pattern: 'return {..., $K: $E instanceof Error ? $E.message : $FALLBACK, ...}'

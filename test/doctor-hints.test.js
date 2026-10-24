@@ -3,7 +3,6 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { initProject, RECOMMENDED_ANSWERS } from '../lib/init.js';
 import { inspectProject } from '../lib/doctor.js';
-import { addOptional } from '../lib/optional.js';
 import { runCli } from '../lib/cli.js';
 import '../lib/commands.js';
 import { tempDir, makeIo } from './helpers.js';
@@ -30,31 +29,72 @@ describe('doctor hints are hints, never failures', () => {
     const io = makeIo(dir, { HOME: home });
     expect(await runCli(['doctor'], io)).toBe(0);
     expect(io.out).toMatch(/Hints \(optional/);
-    expect(io.out).toMatch(/sast-rules/);
+    expect(io.out).toMatch(/mutation/);
   });
 
   it('--warn-only prints hints as notices, not warnings', async () => {
     const { dir, home } = await project();
     const io = makeIo(dir, { HOME: home });
     expect(await runCli(['doctor', '--warn-only'], io)).toBe(0);
-    expect(io.out).toMatch(/::notice::\[standards doctor\] hint sast-rules/);
+    expect(io.out).toMatch(/::notice::\[standards doctor\] hint mutation/);
     expect(io.out).not.toMatch(/::warning.*hint/);
   });
 });
 
-describe('opt-in security tooling', () => {
-  it('hints for missing SAST rules, SCA and mutation; silent once added', async () => {
+describe('security scans (one pipeline: security.yml)', () => {
+  const CI = (inputs) => `name: ci\non: [push]\njobs:\n  security:\n    uses: oneup4real/engineering-standards/.github/workflows/security.yml@v1\n${inputs ? `    with:\n${inputs}\n` : ''}`;
+
+  it('a project using security.yml with semgrep true gets no SAST or SCA hint', async () => {
     const { dir, home } = await project();
-    const before = await hintIds(dir, home);
-    expect(before).toEqual(expect.arrayContaining(['sast-rules', 'mutation']));
-    await addOptional({ targetDir: dir, names: ['sast', 'sca', 'mutation'] });
-    const after = await hintIds(dir, home);
-    for (const id of ['sast-rules', 'sca', 'mutation']) expect(after).not.toContain(id);
+    const ids = await hintIds(dir, home);
+    expect(ids).not.toContain('sast');
+    expect(ids).not.toContain('sca');
   });
 
-  it('the shared security workflow counts as SCA', async () => {
+  it('security.yml with codeql on (the default) counts as SAST and SCA', async () => {
     const { dir, home } = await project();
-    expect(await hintIds(dir, home)).not.toContain('sca');
+    await write(dir, '.github/workflows/ci.yml', CI(''));
+    const ids = await hintIds(dir, home);
+    expect(ids).not.toContain('sast');
+    expect(ids).not.toContain('sca');
+  });
+
+  it('security.yml with codeql false and semgrep off hints SAST only; audit still counts', async () => {
+    const { dir, home } = await project();
+    await write(dir, '.github/workflows/ci.yml', CI('      codeql: false'));
+    const ids = await hintIds(dir, home);
+    expect(ids).toContain('sast');
+    expect(ids).not.toContain('sca');
+  });
+
+  it('without security.yml: hints for both; own CodeQL, Semgrep rules or npm audit silence them', async () => {
+    const { dir, home } = await project();
+    await write(dir, '.github/workflows/ci.yml', 'name: ci\non: [push]\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n');
+    expect(await hintIds(dir, home)).toEqual(expect.arrayContaining(['sast', 'sca']));
+    await write(dir, '.semgrep/standards.yml', 'rules: []\n');
+    await write(dir, '.github/workflows/audit.yml', 'name: a\non: [push]\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm audit --omit=dev\n');
+    const ids = await hintIds(dir, home);
+    expect(ids).not.toContain('sast');
+    expect(ids).not.toContain('sca');
+    await fs.rm(path.join(dir, '.semgrep'), { recursive: true });
+    await write(dir, '.github/workflows/codeql.yml', 'name: c\non: [push]\njobs:\n  c:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: github/codeql-action/analyze@abc\n');
+    expect(await hintIds(dir, home)).not.toContain('sast');
+  });
+
+  it('hints when the project hook repeats pre-push work', async () => {
+    const { dir, home } = await project();
+    await write(dir, '.husky/pre-commit', 'npx --no-install oneup-standards hook pre-commit\nnpx tsc --noEmit\nnpm run test:unit\nnpm test\n');
+    const report = await inspectProject({ targetDir: dir, homeDir: home });
+    const hint = report.hints.find((h) => h.id === 'hook-duplicate-checks');
+    expect(hint.message).toContain('npx tsc --noEmit');
+    expect(hint.message).toContain('npm run test:unit');
+    expect(hint.message).not.toContain('oneup-standards hook pre-commit');
+  });
+
+  it('no duplicate-hook hint for the plain managed pre-commit', async () => {
+    const { dir, home } = await project();
+    await write(dir, '.husky/pre-commit', 'npx --no-install oneup-standards hook pre-commit\n');
+    expect(await hintIds(dir, home)).not.toContain('hook-duplicate-checks');
   });
 
   it('stryker in package.json counts as mutation config', async () => {

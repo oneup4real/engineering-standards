@@ -8,17 +8,6 @@ declare const DOMPurify: { sanitize(s: string): string };
 declare const el: HTMLElement;
 declare const userHtml: string;
 
-// ruleid: standards.server-action-missing-auth-guard
-export async function deleteEverything(id: string) {
-  await db();
-}
-
-// ok: standards.server-action-missing-auth-guard
-export async function deleteTicket(id: string) {
-  await requireStaff();
-  await db();
-}
-
 // ruleid: standards.server-action-error-message-passthrough
 export async function leaky() {
   await requireStaff();
@@ -38,16 +27,6 @@ export async function safe() {
     console.error(e);
     return { success: false, error: "Something went wrong", code: "internal" };
   }
-}
-
-export function View() {
-  // ruleid: standards.react-dangerously-set-inner-html
-  const a = <div dangerouslySetInnerHTML={{ __html: userHtml }} />;
-  // ok: standards.react-dangerously-set-inner-html
-  const b = <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(userHtml) }} />;
-  // ok: standards.react-dangerously-set-inner-html
-  const c = <div dangerouslySetInnerHTML={{ __html: "<b>static</b>" }} />;
-  return [a, b, c];
 }
 
 export function sinks() {

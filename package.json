@@ -33,6 +33,7 @@
     "agents",
     "skills",
     "templates",
+    "semgrep",
     "arch",
     "firebase-testing",
     "next"

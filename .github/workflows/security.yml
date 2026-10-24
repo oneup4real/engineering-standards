@@ -17,6 +17,10 @@ on:
         description: Run Semgrep (works for private repos without Advanced Security)
         type: boolean
         default: false
+      standards-ref:
+        description: Ref of oneup4real/engineering-standards that supplies the custom Semgrep rules (semgrep/standards.yml)
+        type: string
+        default: v1
       audit-level:
         description: Fail npm audit at this severity or above (low, moderate, high, critical)
         type: string
@@ -78,8 +82,27 @@ jobs:
       image: semgrep/semgrep:1.178.0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Fetch the standards Semgrep rules
+        # One security pipeline: registry packs plus our rules. A project's own .semgrep/standards.yml wins.
+        # If this checkout fails (offline mirror, private fork), the scan still runs with the registry packs.
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: oneup4real/engineering-standards
+          ref: ${{ inputs.standards-ref }}
+          path: .standards-rules
+          sparse-checkout: semgrep/standards.yml
+          sparse-checkout-cone-mode: false
       - name: Static analysis (fails on findings)
-        run: semgrep scan --config p/typescript --config p/react --config p/nextjs --config p/secrets --error --metrics=off
+        run: |
+          RULES=""
+          if [ -f .semgrep/standards.yml ]; then RULES=.semgrep/standards.yml
+          elif [ -f .standards-rules/semgrep/standards.yml ]; then RULES=.standards-rules/semgrep/standards.yml
+          else echo "::notice::Standards Semgrep rules not available; running registry packs only."
+          fi
+          set -- --config p/typescript --config p/react --config p/nextjs --config p/secrets
+          if [ -n "$RULES" ]; then set -- "$@" --config "$RULES"; fi
+          semgrep scan "$@" --exclude .standards-rules --error --metrics=off
 
   dependency-review:
     # Needs the dependency graph API, which private repos only get with Advanced Security (same as CodeQL).

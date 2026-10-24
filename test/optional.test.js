@@ -9,23 +9,23 @@ import '../lib/commands.js';
 import { tempDir, makeIo } from './helpers.js';
 
 const OPT = 'templates/optional';
+const RULES = 'semgrep';
 const exists = (p) => fs.access(p).then(() => true, () => false);
 
 describe('optional templates', () => {
-  it('offers sast, sca, mutation and dast', () => {
-    expect(Object.keys(OPTIONAL_FEATURES).sort()).toEqual(['dast', 'mutation', 'sast', 'sca']);
+  it('offers only mutation and dast (SAST and SCA live in security.yml)', () => {
+    expect(Object.keys(OPTIONAL_FEATURES).sort()).toEqual(['dast', 'mutation']);
   });
 
   it('copies the files of a feature into the project and never overwrites them', async () => {
     const dir = await tempDir();
-    const first = await addOptional({ targetDir: dir, names: ['sast'] });
-    expect(first.map((r) => r.action)).toEqual(['created', 'created']);
-    expect(await exists(path.join(dir, '.semgrep/standards.yml'))).toBe(true);
-    expect(await exists(path.join(dir, '.github/workflows/standards-sast.yml'))).toBe(true);
-    await fs.writeFile(path.join(dir, '.semgrep/standards.yml'), 'rules: []\n');
-    const again = await addOptional({ targetDir: dir, names: ['sast'] });
-    expect(again.map((r) => r.action)).toEqual(['skipped', 'unchanged']);
-    expect(await fs.readFile(path.join(dir, '.semgrep/standards.yml'), 'utf8')).toBe('rules: []\n');
+    const first = await addOptional({ targetDir: dir, names: ['dast'] });
+    expect(first.map((r) => r.action)).toEqual(['created']);
+    const file = path.join(dir, '.github/workflows/standards-dast.yml');
+    await fs.writeFile(file, '# mine\n');
+    const again = await addOptional({ targetDir: dir, names: ['dast'] });
+    expect(again.map((r) => r.action)).toEqual(['skipped']);
+    expect(await fs.readFile(file, 'utf8')).toBe('# mine\n');
   });
 
   it('--force replaces and keeps a .bak copy; --dry-run writes nothing', async () => {
@@ -47,24 +47,27 @@ describe('optional templates', () => {
     const dir = await tempDir();
     const none = makeIo(dir);
     expect(await runCli(['add'], none)).toBe(2);
-    expect(none.err).toMatch(/sast.*sca.*mutation.*dast|Usage/s);
+    expect(none.err).toMatch(/mutation.*dast|Usage/s);
+    expect(none.err).not.toMatch(/\bsast\b|\bsca\b/);
     const io = makeIo(dir);
     expect(await runCli(['add', 'all'], io)).toBe(0);
-    for (const f of ['.semgrep/standards.yml', '.github/workflows/standards-sca.yml', 'stryker.config.mjs', '.github/workflows/standards-dast.yml']) {
+    for (const f of ['stryker.config.mjs', '.github/workflows/standards-mutation.yml', '.github/workflows/standards-dast.yml']) {
       expect(await exists(path.join(dir, f)), f).toBe(true);
     }
     expect(await runCli(['add', 'bogus'], makeIo(dir))).toBe(2);
+    expect(await runCli(['add', 'sast'], makeIo(dir))).toBe(2);
+    expect(await runCli(['add', 'sca'], makeIo(dir))).toBe(2);
   });
 
   it('init --with adds the chosen features and nothing else', async () => {
     const { parseWith } = await import('../lib/optional.js');
-    expect(parseWith(['--yes', '--with', 'sast,sca'])).toEqual(['sast', 'sca']);
+    expect(parseWith(['--yes', '--with', 'mutation,dast'])).toEqual(['mutation', 'dast']);
     expect(parseWith(['--yes'])).toEqual([]);
   });
 });
 
 describe('workflow templates', () => {
-  const files = ['standards-sast', 'standards-sca', 'standards-mutation', 'standards-dast'];
+  const files = ['standards-mutation', 'standards-dast'];
   it('parse, pin third-party actions to SHAs, are opt-in (no default blocking) and read only', async () => {
     for (const name of files) {
       const text = await fs.readFile(`${OPT}/.github/workflows/${name}.yml`, 'utf8');
@@ -82,10 +85,8 @@ describe('workflow templates', () => {
     expect(text).toMatch(/DAST_TARGET_URL is not set; skipped/);
   });
 
-  it('mutation and sast report only until a repository variable switches blocking on', async () => {
-    expect(await fs.readFile(`${OPT}/.github/workflows/standards-sast.yml`, 'utf8')).toMatch(/STANDARDS_SAST_BLOCKING/);
+  it('mutation reports only until a repository variable switches blocking on', async () => {
     expect(await fs.readFile(`${OPT}/.github/workflows/standards-mutation.yml`, 'utf8')).toMatch(/STANDARDS_MUTATION_BREAK/);
-    expect(await fs.readFile(`${OPT}/.github/workflows/standards-sca.yml`, 'utf8')).toMatch(/STANDARDS_SCA_BLOCKING/);
   });
 });
 
@@ -107,16 +108,44 @@ describe('stryker.config.mjs', () => {
   });
 });
 
+describe('one security pipeline', () => {
+  it('no separate SAST or SCA templates remain', async () => {
+    for (const f of ['standards-sast', 'standards-sca']) expect(await exists(`${OPT}/.github/workflows/${f}.yml`), f).toBe(false);
+  });
+
+  it('security.yml semgrep job adds our rules (project file first, central file second) and stays valid without them', async () => {
+    const text = await fs.readFile('.github/workflows/security.yml', 'utf8');
+    const wf = parse(text);
+    expect(wf.on.workflow_call.inputs['standards-ref'].default).toBe('v1');
+    const steps = wf.jobs.semgrep.steps;
+    const fetch = steps.find((s) => /Fetch the standards Semgrep rules/.test(s.name));
+    expect(fetch['continue-on-error']).toBe(true);
+    expect(fetch.with.repository).toBe('oneup4real/engineering-standards');
+    expect(fetch.with['sparse-checkout']).toBe('semgrep/standards.yml');
+    const run = steps.find((s) => /Static analysis/.test(s.name)).run;
+    expect(run).toContain('.semgrep/standards.yml');
+    expect(run).toContain('.standards-rules/semgrep/standards.yml');
+    expect(run).toContain('--error');
+    expect(run).toContain('p/typescript');
+    for (const [, ref] of text.replace(/^\s*#.*$/gm, '').matchAll(/uses:\s*[\w.-]+\/[\w./-]+@(\S+)/g)) expect(ref).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  it('the rules file the workflow fetches ships in the package', async () => {
+    const pkg = JSON.parse(await fs.readFile('package.json', 'utf8'));
+    expect(pkg.files).toContain('semgrep');
+    expect(await exists(`${RULES}/standards.yml`)).toBe(true);
+  });
+});
+
 describe('semgrep ruleset', () => {
   it('is well-formed and every rule has a flagged and a clean fixture', async () => {
-    const rules = parse(await fs.readFile(`${OPT}/semgrep/standards.yml`, 'utf8')).rules;
-    const fixture = await fs.readFile(`${OPT}/semgrep/standards.tsx`, 'utf8');
+    const rules = parse(await fs.readFile(`${RULES}/standards.yml`, 'utf8')).rules;
+    const fixture = await fs.readFile(`${RULES}/standards.tsx`, 'utf8');
     const ids = rules.map((r) => r.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids).toEqual(expect.arrayContaining([
-      'standards.server-action-missing-auth-guard', 'standards.react-dangerously-set-inner-html', 'standards.unsanitized-html-sink',
-      'standards.insecure-random-for-secret', 'standards.server-action-error-message-passthrough',
-    ]));
+    expect(ids.sort()).toEqual([
+      'standards.insecure-random-for-secret', 'standards.server-action-error-message-passthrough', 'standards.unsanitized-html-sink',
+    ]);
     for (const rule of rules) {
       expect(rule.message?.length, rule.id).toBeGreaterThan(20);
       expect(['ERROR', 'WARNING', 'INFO'], rule.id).toContain(rule.severity);
@@ -130,6 +159,6 @@ describe('semgrep ruleset', () => {
   let semgrep = false;
   try { execFileSync('semgrep', ['--version'], { stdio: 'ignore' }); semgrep = true; } catch { /* not installed: rules stay unverified */ }
   it.skipIf(!semgrep)('passes semgrep --test against its fixtures', () => {
-    execFileSync('semgrep', ['--test', '--config', `${OPT}/semgrep`, `${OPT}/semgrep`], { stdio: 'pipe' });
+    execFileSync('semgrep', ['--test', '--config', RULES, RULES], { stdio: 'pipe' });
   });
 });

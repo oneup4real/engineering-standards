@@ -55,9 +55,10 @@ describe('collectReadiness', () => {
     const { dir, home } = await project();
     const items = await collectReadiness({ targetDir: dir, homeDir: home, run: runner(FULL), ci: false });
     for (const id of ['git-remote', 'gh-installed', 'gh-auth', 'branch-protection', 'hooks', 'ci', 'pr-template']) expect(byId(items, id).state).toBe('ok');
-    expect(byId(items, 'sast').state).toBe('missing');
-    expect(byId(items, 'sast').optional).toBe(true);
-    expect(byId(items, 'sast').detail).toMatch(/report only/i);
+    expect(items.find((i) => i.id === 'sast' || i.id === 'sca')).toBeUndefined();
+    expect(byId(items, 'mutation').state).toBe('missing');
+    expect(byId(items, 'mutation').optional).toBe(true);
+    expect(byId(items, 'mutation').detail).toMatch(/report only/i);
   });
 
   it('branch protection missing when GitHub says 404', async () => {
