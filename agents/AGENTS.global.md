@@ -18,6 +18,7 @@ Check whether the required AI skills are loaded in your context:
 - `frontend-design`
 - `superdesign`
 - `ui-consistency`
+- `factory-review`
 
 **HALT IF SKILLS ARE MISSING:**
 If any core skills (`brainstorming`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`) are missing from your available skills, you MUST stop immediately before editing any code and alert the user:

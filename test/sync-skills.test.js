@@ -279,3 +279,33 @@ describe('Claude Code installation of bundled skills', () => {
     expect(results.map((r) => r.skill)).not.toContain('frontend-design');
   });
 });
+
+describe('factory-review skill distribution', () => {
+  it('is required, bundled, and installed for Claude Code and Antigravity', async () => {
+    expect(REQUIRED_SKILLS).toContain('factory-review');
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'standards-skills-'));
+    const home = path.join(tmp, 'home');
+    const results = await syncSkills({ homeDir: home, scope: 'global' });
+    const installed = results.filter((r) => r.skill === 'factory-review').map((r) => r.harness).sort();
+    expect(installed).toEqual(['antigravity', 'claude']);
+    for (const dir of ['.claude/skills', '.gemini/config/skills']) {
+      await fs.access(path.join(home, dir, 'factory-review', 'SKILL.md'));
+      await fs.access(path.join(home, dir, 'factory-review', 'references', 'security-review.md'));
+    }
+  });
+
+  it('doctor names factory-review when it is missing for Claude Code', async () => {
+    const { inspectProject } = await import('../lib/doctor.js');
+    const { initProject, RECOMMENDED_ANSWERS } = await import('../lib/init.js');
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'standards-skills-'));
+    const home = path.join(tmp, 'home');
+    const targetDir = path.join(tmp, 'proj');
+    await fs.mkdir(targetDir, { recursive: true });
+    await fs.writeFile(path.join(targetDir, 'package.json'), JSON.stringify({ name: 'demo' }));
+    await initProject({ targetDir, answers: { ...RECOMMENDED_ANSWERS, hooks: false }, homeDir: home });
+    await fs.mkdir(path.join(home, '.claude'), { recursive: true });
+    const item = (await inspectProject({ targetDir, homeDir: home })).items.find((i) => i.id === 'claude-skills');
+    expect(item?.status).toBe('missing');
+    expect(item?.message).toMatch(/factory-review/);
+  });
+});

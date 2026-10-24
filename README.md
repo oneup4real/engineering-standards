@@ -575,7 +575,7 @@ graph TD
 
 #### 1. Zero-Forget AI Pre-Flight Gate (`AGENTS.global.md`)
 Section 0 of `AGENTS.global.md` instructs every AI model at the prompt level:
-- Before writing code, the agent MUST verify that essential skills (`brainstorming`, `writing-plans`, `executing-plans`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `requesting-code-review`, `frontend-design`, `superdesign`, `ui-consistency`) are loaded in its context.
+- Before writing code, the agent MUST verify that essential skills (`brainstorming`, `writing-plans`, `executing-plans`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `requesting-code-review`, `frontend-design`, `superdesign`, `ui-consistency`, `factory-review`) are loaded in its context.
 - **Halt Condition:** If any core skills are missing, the agent **stops immediately** and alerts the developer:
   > ⚠️ **Required AI Skills Missing!** Run `npx oneup-standards sync-skills` in your terminal to synchronize your skills into Antigravity, then restart this conversation.
 
