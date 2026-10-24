@@ -71,13 +71,13 @@ Classify every task at the start and state the tier in the plan. The highest mat
 |---|---|---|---|---|---|
 | T0 | docs, formatting, mechanical edits | none | `small` | tools only | CI green |
 | T1 | UI only, no logic | short | `small` | tools + ui (once per batch) | CI green |
-| T2 | business logic | spec + tests | `mid` | tools + logic, test-quality, architecture as triggered | CI green + approver |
-| T3 | security, money, roles, public endpoint, data migration | spec with abuse cases, each becomes a test | `mid` | all specialists, `strong` security review | **human approval before merge/release, always** |
+| T2 | business logic | spec + tests | `mid` | tools + logic; architecture, test-quality by path | CI green + approver |
+| T3 | security, money, roles, public endpoint, data migration | spec with abuse cases, each becomes a test | `mid` | security, logic, test-quality always; ui, architecture by path; `strong` security review | **human approval before merge/release, always** |
 
 - Model roles, never product names: `strong` = T3 spec and abuse cases, architecture decisions, T3 security review, T2 approver; `mid` = orchestrator, T2 spec and plan, T2/T3 builder, standard reviewers; `small` = mechanical edits, T0/T1 builder, doc and format fixes. Escalate a role only after a failed round.
 - Tools before agents: lint, types, tests, coverage, depcruise, SAST, secret scan, bundle check decide first; an LLM reviewer never repeats what a tool proves.
 - `npx oneup-standards risk-tier --base origin/main` classifies the diff and names the reviewers; use it at G0 and again before review.
-- Review triggers by path (`risk-tier` names them; at T3 all five reviewers run: security, ui, logic, architecture, test-quality). Verdicts are `approve`, `changes-requested` or `escalate`; findings are `blocker`, `major` or `minor`. Every T3 security review answers OWASP Web Top 10 and API Security Top 10 with one line per applicable item.
+- Review triggers by path (`risk-tier` names them; T3: security, logic, test-quality always, ui and architecture only when UI or layer paths changed; T2: logic; T1: ui; T0: none). Verdicts are `approve`, `changes-requested` or `escalate`; findings are `blocker`, `major` or `minor`. Every T3 security review answers OWASP Web Top 10 and API Security Top 10 with one line per applicable item.
 - Agents never push to the default branch and never merge. They push a feature branch and open a pull request; a human merges. T3 requires human approval in the PR. Direct pushes to main deploy to production in many projects.
 - `npm run test:unit` must run the same test project as CI. Numbers and counts claimed in docs must be verified by script where possible.
 

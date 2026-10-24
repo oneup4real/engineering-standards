@@ -43,16 +43,27 @@ describe('classifyPaths (defaults)', () => {
   it('money, payment and role keywords in the path make it T3', () => {
     for (const p of ['src/lib/payment-status.ts', 'src/components/RoleSwitcher.tsx', 'src/lib/fee.ts', 'src/lib/money.ts', 'src/lib/invoice/list.ts']) expect(tier(p), p).toBe('T3');
   });
-  it('the highest tier of any file wins, and T3 fans out to all five reviewers', () => {
+  it('the highest tier of any file wins; UI and action paths together give all five reviewers', () => {
     const r = classifyPaths(['README.md', 'src/components/A.tsx', 'src/app/actions/a.ts']);
     expect(r.tier).toBe('T3');
     expect(r.reviewers).toEqual(['security', 'ui', 'logic', 'arch', 'test-quality']);
     expect(r.files.find((f) => f.path === 'README.md').tier).toBe('T0');
   });
-  it('tests of guarded or money code still trigger test-quality', () => {
-    const r = classifyPaths(['tests/unit/payment.test.ts']);
-    expect(r.tier).toBe('T0');
-    expect(r.reviewers).toEqual(['test-quality']);
+  it('T3 always has security, logic and test-quality; ui and architecture only by path', () => {
+    expect(classifyPaths(['firestore.rules']).reviewers).toEqual(['security', 'logic', 'test-quality']);
+    expect(classifyPaths(['src/lib/payment-status.ts']).reviewers).toEqual(['security', 'logic', 'test-quality']);
+    expect(classifyPaths(['src/app/actions/a.ts']).reviewers).toEqual(['security', 'logic', 'arch', 'test-quality']);
+    expect(classifyPaths(['src/server/services/x.ts', 'src/components/A.tsx']).reviewers).toEqual(['security', 'ui', 'logic', 'arch', 'test-quality']);
+    expect(classifyPaths(['src/components/RoleSwitcher.tsx']).reviewers).toEqual(['security', 'ui', 'logic', 'test-quality']);
+  });
+  it('T2 is logic, plus architecture and test-quality by path', () => {
+    expect(classifyPaths(['src/lib/format.ts']).reviewers).toEqual(['logic']);
+    expect(classifyPaths(['src/domain/a.ts']).reviewers).toEqual(['logic', 'arch']);
+    expect(classifyPaths(['src/lib/format.ts', 'tests/unit/guard.test.ts']).reviewers).toEqual(['logic', 'test-quality']);
+  });
+  it('T1 is ui only; T0 has no reviewer, not even test-quality', () => {
+    expect(classifyPaths(['src/components/A.tsx']).reviewers).toEqual(['ui']);
+    expect(classifyPaths(['tests/unit/payment.test.ts'])).toMatchObject({ tier: 'T0', reviewers: [] });
   });
   it('unknown source paths are classified conservatively as T2', () => {
     expect(tier('lib/whatever.js')).toBe('T2');
@@ -89,7 +100,7 @@ describe('risk-tier command', () => {
     const io = makeIo(dir);
     expect(await runCli(['risk-tier', '--base', 'main'], io)).toBe(0);
     expect(io.out).toMatch(/Tier: T3/);
-    expect(io.out).toMatch(/Reviewers: security, ui, logic, arch, test-quality/);
+    expect(io.out).toMatch(/Reviewers: security, logic, arch, test-quality/);
     expect(io.out).toMatch(/Human approval required: yes/);
   });
 

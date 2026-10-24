@@ -24,8 +24,10 @@ State the tier in the plan. T3 always needs a human approval before merge/releas
 1. Spec (T2: tests listed; T3: abuse cases from `references/abuse-cases-template.md`, each becomes a test).
 2. Builder by tier, model roles in `references/model-roles.md` (`strong`, `mid`, `small`).
 3. Tools gate in CI first. Reviewers READ that output; they never re-run gates.
-4. Dispatch only the reviewers the changed paths trigger, with `references/reviewer-brief-template.md`.
+4. Dispatch only these reviewers (`risk-tier` names them), with `references/reviewer-brief-template.md`.
 5. Max 2 fix rounds, then escalate to the human with the open findings.
+
+Reviewers: T3 = security + logic + test-quality always, ui and architecture only when UI or layer/import/action paths changed; T2 = logic (+ architecture, test-quality by path); T1 = ui; T0 = none.
 
 ## 3. Reviewer references
 
@@ -33,6 +35,6 @@ State the tier in the plan. T3 always needs a human approval before merge/releas
 |---|---|---|
 | security | auth, actions, `src/server`, rules, payments/money, public routes, uploads; always at T3 | `references/security-review.md` |
 | ui | `src/components`, styles | `references/ui-review.md` (uses `ui-consistency`) |
-| logic | `src/lib`, `src/domain`, `src/shared`, services, state machines | `references/logic-review.md` |
+| logic | `src/lib`, `src/domain`, `src/shared`, services, state machines; always at T3 | `references/logic-review.md` |
 | architecture | new folders, cross-layer imports, actions, `src/server`, `src/domain` (never T0) | `references/arch-review.md` |
 | test-quality | tests of guards and money/state logic; always at T3 | `references/test-quality.md` |

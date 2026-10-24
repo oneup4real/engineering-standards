@@ -135,7 +135,7 @@ Highest matching tier wins; when unsure take the higher one; a tier may go up du
 | Spec (G1) | none | 3-line brief | spec with tests listed | spec with abuse cases, each a test |
 | Builder (G3) | `small` | `small` | `mid` | `mid` |
 | Tool gates (G4) | required | required | required | required, plus mutation and SAST |
-| Reviewers (G5) | none | ui, once per batch | logic, plus architecture and test-quality when triggered | **all five**; security is `strong` and answers the OWASP table |
+| Reviewers (G5) | none | ui, once per batch | logic; architecture and test-quality by path | **security, logic, test-quality always**; ui only for UI paths, architecture only for layer/import/action paths; security is `strong` and answers the OWASP table |
 | Fix rounds | n/a | max 2 | max 2 | max 2, then human |
 | Approver (G6) | CI green, human merges | CI green, human merges | agent approver (`strong`), human merges | **human approval, always**, then human merges |
 
@@ -180,7 +180,7 @@ Every rule is checkable. A tool checks first; the reviewer only judges what the 
 
 | Topic | Definition |
 |---|---|
-| Triggered by | Changed paths (table below), not by default. At T3 all five run. |
+| Triggered by | Changed paths (table below). T3: security, logic, test-quality always; ui and architecture by path. T2: logic. T1: ui. T0: none. |
 | Reads first | Spec, diff, abuse cases (T3), then the CI/tool output named in the table. Never re-runs gates, never reviews files outside the scope, never restyles. |
 | Finding vs pass | **blocker:** a proof (input or test) that a spec rule, abuse case, security, money or state invariant breaks, or a ratchet/baseline grew. **major:** a checklist rule is violated but no breakage is shown yet (e.g. allowed test without denied twin). **minor:** a hint; does not block and gets no fix round. A rule that does not apply is `n/a`, not a finding. |
 | Verdict | `approve` (no blocker, no major) \| `changes-requested` \| `escalate` (needs a human decision, or round 2 ends with open blockers). |
@@ -191,7 +191,7 @@ Every rule is checkable. A tool checks first; the reviewer only judges what the 
 |---|---|---|---|---|
 | security | `src/app/actions/**`, `src/server/**`, `*.rules`, `auth*`, email templates, paths with money/payment/fee/role/token keywords, uploads, public routes; always at T3 | `strong` at T3, `mid` at T2 | SAST, gitleaks, audit, rules tests, mutation report | `security-review.md` |
 | ui | `src/components/**`, styles | `mid` (`small` for the checklist of a T1 batch) | lint, style ratchet, visual regression | `ui-review.md`, skill `ui-consistency` |
-| logic | `src/lib/**`, `src/domain/**`, `src/shared/**`, services, state machines, unknown source paths | `mid` | unit/service tests, coverage | `logic-review.md` |
+| logic | `src/lib/**`, `src/domain/**`, `src/shared/**`, services, state machines, unknown source paths; always at T3 | `mid` | unit/service tests, coverage | `logic-review.md` |
 | architecture | new folders, changed imports across layers, `src/app/actions/**`, `src/server/**`, `src/domain/**`, depcruise config (never for T0) | `mid` | depcruise, arch suite | `arch-review.md` |
 | test-quality | tests of guards, money or state (test paths with guard/money words); always at T3 | `mid` | coverage, mutation report | `test-quality.md` |
 
