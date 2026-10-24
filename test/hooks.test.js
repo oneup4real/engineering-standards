@@ -59,3 +59,102 @@ describe('prePush', () => {
     expect(deps.calls).toEqual(['npx --no-install tsc --noEmit', 'npm test --silent']);
   });
 });
+
+function sastDeps(over = {}) {
+  const base = fakeDeps({ installed: ['gitleaks', ...(over.semgrep === false ? [] : ['semgrep'])], failing: over.failing ?? [], staged: over.staged ?? ['src/a.ts', 'README.md', 'src/b.tsx'] });
+  return Object.assign(base, { rulesFile: async () => (over.rules === null ? null : '/pkg/semgrep/standards.yml'), readConfig: async () => over.config ?? {} });
+}
+
+describe('preCommit SAST on staged files', () => {
+  it('runs semgrep with our rules file on staged code files only, report-only by default', async () => {
+    const deps = sastDeps({ failing: ['semgrep'] });
+    const io = makeIo();
+    expect(await preCommit(io, deps)).toBe(0);
+    expect(deps.calls.at(-1)).toBe('semgrep scan --config /pkg/semgrep/standards.yml --metrics=off --quiet src/a.ts src/b.tsx');
+    expect(deps.calls.at(-1)).not.toContain('--error');
+    expect(io.err).toMatch(/report-only/);
+  });
+
+  it('hooks.sastBlocking adds --error and fails the commit on findings', async () => {
+    const deps = sastDeps({ failing: ['semgrep'], config: { hooks: { sastBlocking: true } } });
+    const io = makeIo();
+    expect(await preCommit(io, deps)).toBe(1);
+    expect(deps.calls.at(-1)).toContain('--error');
+    expect(io.err).toMatch(/SAST/);
+  });
+
+  it('prints one install hint and continues when semgrep is missing', async () => {
+    const deps = sastDeps({ semgrep: false });
+    const io = makeIo();
+    expect(await preCommit(io, deps)).toBe(0);
+    expect(deps.calls.some((c) => c.startsWith('semgrep'))).toBe(false);
+    expect(io.err.trim().split('\n').filter((l) => l.includes('brew install semgrep'))).toHaveLength(1);
+  });
+
+  it('skips silently when no code files are staged or no rules file exists', async () => {
+    const docs = sastDeps({ staged: ['README.md'] });
+    const io = makeIo();
+    expect(await preCommit(io, docs)).toBe(0);
+    expect(io.err).not.toMatch(/semgrep/);
+    const noRules = sastDeps({ rules: null, semgrep: false });
+    const io2 = makeIo();
+    expect(await preCommit(io2, noRules)).toBe(0);
+    expect(io2.err).not.toMatch(/semgrep/);
+  });
+
+  it('runs SAST after gitleaks and lint-staged, and not at all when lint fails', async () => {
+    const ok = sastDeps();
+    await preCommit(makeIo(), ok);
+    expect(ok.calls.map((c) => c.split(' ')[0])).toEqual(['gitleaks', 'npx', 'semgrep']);
+    const bad = sastDeps({ failing: ['lint-staged'] });
+    expect(await preCommit(makeIo(), bad)).toBe(1);
+    expect(bad.calls.some((c) => c.startsWith('semgrep'))).toBe(false);
+  });
+});
+
+function auditDeps({ changed = true, online = true, failing = [], config = {} } = {}) {
+  return Object.assign(fakeDeps({ failing }), { lockfileChanged: async () => changed, online: async () => online, readConfig: async () => config });
+}
+
+describe('prePush SCA', () => {
+  it('runs npm audit once after tsc and tests when package-lock.json changed, default level high', async () => {
+    const deps = auditDeps();
+    expect(await prePush(makeIo(), deps)).toBe(0);
+    expect(deps.calls).toEqual(['npx --no-install tsc --noEmit', 'npm test --silent', 'npm audit --omit=dev --audit-level=high']);
+  });
+
+  it('uses hooks.auditLevel', async () => {
+    const deps = auditDeps({ config: { hooks: { auditLevel: 'critical' } } });
+    await prePush(makeIo(), deps);
+    expect(deps.calls.at(-1)).toBe('npm audit --omit=dev --audit-level=critical');
+  });
+
+  it('does not audit when the lockfile is unchanged', async () => {
+    const deps = auditDeps({ changed: false });
+    expect(await prePush(makeIo(), deps)).toBe(0);
+    expect(deps.calls.some((c) => c.startsWith('npm audit'))).toBe(false);
+  });
+
+  it('offline: one note, no audit, never fails', async () => {
+    const deps = auditDeps({ online: false });
+    const io = makeIo();
+    expect(await prePush(io, deps)).toBe(0);
+    expect(deps.calls.some((c) => c.startsWith('npm audit'))).toBe(false);
+    expect(io.err.trim().split('\n').filter((l) => /offline/i.test(l))).toHaveLength(1);
+  });
+
+  it('findings are report-only by default and block with hooks.auditBlocking', async () => {
+    const soft = auditDeps({ failing: ['npm audit'] });
+    const io = makeIo();
+    expect(await prePush(io, soft)).toBe(0);
+    expect(io.err).toMatch(/report-only/);
+    const hard = auditDeps({ failing: ['npm audit'], config: { hooks: { auditBlocking: true } } });
+    expect(await prePush(makeIo(), hard)).toBe(1);
+  });
+
+  it('skips the audit when tests already failed', async () => {
+    const deps = auditDeps({ failing: ['npm test'] });
+    expect(await prePush(makeIo(), deps)).toBe(1);
+    expect(deps.calls.some((c) => c.startsWith('npm audit'))).toBe(false);
+  });
+});
