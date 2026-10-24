@@ -11,6 +11,7 @@
 - `doctor`: readiness checklist (also at the end of `init`) with the exact command per missing item and a list of what only the human can do; hints `branch-protection` and `agent-merge-deny` (Claude Code `Bash(gh pr merge:*)`).
 
 ### Changed
+- README "What each reviewer checks: the principles" (architecture, UI with the 4-layer diagram, logic, security, test quality); `ui-review.md` and `arch-review.md` carry the same principles.
 - `sync-agents --global` writes a short bootstrap block (also for Codex) instead of the full standard; an old full block is replaced on the next run, text outside the block is kept. The full standard lives in each project's `AGENTS.md`. The `duplicate-standards` hint only fires for the full global block.
 - Notes: `gh` is never needed by tests or CI; commands that use it degrade to printed instructions. Not verified against a real GitHub (no `gh` on the release machine): `protect-branch --apply`, `pr` with `gh`.
 

@@ -236,7 +236,56 @@ tests, config (tests of guards or money still trigger `test-quality`). Replace t
 | architecture | new folders, cross-layer imports, actions | `mid` | `arch-review.md` | depcruise, arch suite |
 | test-quality | tests of guards, money, state | `mid` | `test-quality.md` | coverage, mutation report |
 
-Checklists live in `skills/factory-review/references/`.
+Checklists live in `skills/factory-review/references/`. The principles behind them: [What each reviewer checks](#what-each-reviewer-checks-the-principles).
+
+### What each reviewer checks: the principles
+
+Each rule is checkable. A tool checks first; the reviewer only judges what the tool cannot. The reference file carries the same list so reviewers get it without this README.
+
+**Architecture** (tool: depcruise, arch suite; file `arch-review.md`)
+- Write path is UI -> server action -> service -> adapter. No database write from UI code.
+- Every file under `src/server/` starts with `import 'server-only'`; the UI never imports from it.
+- Every exported action guards the caller in its body (or has an explicit public marker and a rate limit), validates input with a schema and returns `{ success, data | error, code? }`.
+- Identity, roles, owners, prices and recipients come from the server, never from the client.
+- Business rules live in services or the domain. The domain imports only domain and shared; adapters implement its ports.
+- No cross-layer import, no new entry in a ratchet or baseline file.
+
+**UI** (tool: lint, style ratchet, visual regression; files `ui-review.md`, skill `ui-consistency`)
+
+```mermaid
+flowchart LR
+    classDef tool fill:#a8e0b0,stroke:#23753a,color:#000
+    classDef layer fill:#a9cdf5,stroke:#1f5fa8,color:#000
+    T["Tokens<br/>@theme: raw values"]:::layer --> P["Primitives<br/>cva + cn, data-ui"]:::layer
+    P --> F["Feature components<br/>know the domain"]:::layer
+    F --> G["Pages<br/>compose only"]:::layer
+    R["Style ratchet,<br/>catalog, visual net"]:::tool -.-> P
+    R -.-> F
+```
+
+- Tokens: raw values (hex, rgb, palette classes, arbitrary px) exist only in the token layer. Missing step: add a token.
+- Primitives: variants via `cva`, classes merged with `cn()`, tokens only, `data-ui` hook, catalog entry, tests, visual-net entry. Decision test: "does it know the domain?" Yes: feature component. No: primitive.
+- Feature components use primitives; no hand-built buttons or overlays. `className` from the caller is for layout only.
+- Pages only compose.
+- The plan holds a reuse table (reuse vs new, with reason); the reviewer compares it to the diff.
+- Refactors keep a zero-pixel diff; ratchets and baselines only shrink.
+
+**Logic** (tool: unit/service tests, coverage; file `logic-review.md`)
+- Every spec rule and abuse case has a test that fails when the behaviour is removed.
+- State-machine truth table (state x event): no impossible combination, no second write path that skips the transition rule.
+- Legacy data matrix (old record shapes x read, display, write, migrate): each cell handled or explicitly out of scope.
+- Rounding, currency, time zones, double submit and retries are covered; error paths leave no partial write.
+
+**Security** (tool: SAST, gitleaks, audit, rules tests; file `security-review.md`)
+- OWASP Web Top 10 and API Security Top 10, one line per applicable item; each abuse case maps to a test.
+- Deny by default: allowed and denied cases for every rule, role and owner check; "signed in" is not authorization.
+- Server-side validation and ownership re-read; no secrets or confidential data in the client bundle; public endpoints rate-limited with reduced view models.
+
+**Test quality** (tool: coverage, mutation report; file `test-quality.md`)
+- Every allowed-case test has a denied twin (wrong role, owner, anonymous, expired, out of range).
+- A surviving mutant in a guard, comparison or calculation is a missing test.
+- Tests assert explicit values; regenerated snapshots prove nothing. No mocked authorization, no sleeps or real clocks.
+- Test names state the rule.
 
 ### Tier x step
 
