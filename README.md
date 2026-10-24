@@ -23,13 +23,14 @@ Because guardrails are enforced by deterministic machine gates (Husky pre-commit
 
 ## Table of Contents
 
+0. [The delivery flow: who does what, when](#the-delivery-flow-who-does-what-when)
 1. [Secure SDLC (SSDLC) Phase Mapping](#1-secure-sdlc-ssdlc-phase-mapping)
 2. [SSDLC Pipeline & Architecture Flow](#2-ssdlc-pipeline--architecture-flow)
 3. [Tools Used & Risk Mitigation Matrix](#3-tools-used--risk-mitigation-matrix)
     - [Defense-in-Depth: SAST vs. Linting vs. Testing](#defense-in-depth-sast-vs-linting-vs-testing)
 4. [Architectural Guardrails & Threat Boundaries](#4-architectural-guardrails--threat-boundaries)
     - [UI Consistency Guardrails](#ui-consistency-guardrails)
-5. [Subagent Dual-Control Protocol](#5-subagent-dual-control-protocol)
+5. [Specialist Review Protocol (Dual Control)](#5-specialist-review-protocol-dual-control)
 6. [Cross-Harness AI Skill Governance (Antigravity & Claude Code)](#6-cross-harness-ai-skill-governance-antigravity--claude-code)
 7. [Quickstart: New Projects](#7-quickstart-new-projects)
 8. [Quickstart: Existing Projects](#8-quickstart-existing-projects)
@@ -50,6 +51,196 @@ Because guardrails are enforced by deterministic machine gates (Husky pre-commit
 
 ---
 
+## The delivery flow: who does what, when
+
+One rule drives everything: **cheap deterministic tools first, LLM reviewers only where triggered, the
+smallest sufficient model per role, gates run once in CI.** Agents read the CI evidence; they do not re-run it.
+
+Why: in a 70-agent project the value came from reviewers with a specific attack brief (stored XSS, a short code
+used as credential, bypass via the edit action, inconsistent paid/approved state), from mutation checks of tests
+(surviving mutants exposed unguarded paths) and from real-browser fuzzing. The waste came from the strongest model
+doing mechanical work, the same gates re-run by implementer, reviewer and controller, per-task reviews of
+mechanical UI work, unbounded fix loops, and recurring findings (test gaps, wrong numbers in docs) that a tool finds.
+
+Legend: amber = human, blue = agent, green = tool/CI, red outline = gate or decision. Model roles: `strong`, `mid`, `small` (never product names).
+
+### (a) Big picture: gates G0 to G6
+
+```mermaid
+flowchart TD
+    classDef human fill:#ffd37a,stroke:#9a6b00,color:#000
+    classDef agent fill:#a9cdf5,stroke:#1f5fa8,color:#000
+    classDef tool fill:#a8e0b0,stroke:#23753a,color:#000
+    classDef gate fill:#fff,stroke:#d32f2f,stroke-width:3px,color:#000
+    subgraph Human
+        H1["Request"]:::human
+        H2{"G1 Spec approved?"}:::gate
+        H3["G6 Human approval"]:::human
+        H4["Operate and feedback"]:::human
+    end
+    subgraph Orchestrator
+        O1["G0 Classify tier T0-T3"]:::agent
+        O2["G1 Spec and abuse cases"]:::agent
+        O3["G2 Plan"]:::agent
+        D3{"Tier T3?"}:::gate
+    end
+    subgraph Builder
+        B1["G3 Build with TDD"]:::agent
+    end
+    subgraph Reviewers
+        R1["G5 Specialist review by path"]:::agent
+        D2{"Approved?"}:::gate
+    end
+    subgraph Tools["Tools and CI"]
+        T1["G4 Tool gates in CI"]:::tool
+        D1{"All green?"}:::gate
+        T2["Merge and release"]:::tool
+    end
+    H1 --> O1 --> O2 --> H2
+    H2 -->|No| O2
+    H2 -->|Yes| O3 --> B1 --> T1 --> D1
+    D1 -->|No| B1
+    D1 -->|Yes| R1 --> D2
+    D2 -->|"No, max 2 rounds"| B1
+    D2 -->|Yes| D3
+    D3 -->|Yes| H3 --> T2
+    D3 -->|No| T2
+    T2 --> H4
+    H4 -.->|"recurring finding becomes a tool check"| H1
+```
+
+### (b) Risk tier: which questions, in which order
+
+```mermaid
+flowchart TD
+    classDef agent fill:#a9cdf5,stroke:#1f5fa8,color:#000
+    classDef gate fill:#fff,stroke:#d32f2f,stroke-width:3px,color:#000
+    classDef t3 fill:#f5b5b5,stroke:#d32f2f,color:#000
+    S["New task"]:::agent --> Q1{"Security, money, roles, public endpoint, uploads or data migration?"}:::gate
+    Q1 -->|Yes| T3["T3 high risk"]:::t3
+    Q1 -->|No| Q2{"Business logic or state change?"}:::gate
+    Q2 -->|Yes| T2["T2 logic"]:::agent
+    Q2 -->|No| Q3{"UI only, no logic?"}:::gate
+    Q3 -->|Yes| T1["T1 UI"]:::agent
+    Q3 -->|No| T0["T0 docs, mechanical"]:::agent
+```
+
+Highest matching tier wins; when unsure take the higher one. Examples: `skills/factory-review/references/tiers.md`.
+
+### (c) Pipeline per tier
+
+```mermaid
+flowchart TD
+    classDef human fill:#ffd37a,stroke:#9a6b00,color:#000
+    classDef agent fill:#a9cdf5,stroke:#1f5fa8,color:#000
+    classDef tool fill:#a8e0b0,stroke:#23753a,color:#000
+    classDef gate fill:#fff,stroke:#d32f2f,stroke-width:3px,color:#000
+    TIER{"Tier?"}:::gate
+    A0["small builds"]:::agent
+    A1["small builds, short brief"]:::agent
+    A2["mid builds, spec and tests"]:::agent
+    A3["strong spec with abuse cases, mid builds"]:::agent
+    CI["Tool gates in CI, once"]:::tool
+    B1["ui review, once per batch"]:::agent
+    B2["logic review, plus arch and test-quality if triggered"]:::agent
+    B3["all specialists, strong security review"]:::agent
+    C2["approver agent, strong"]:::agent
+    C3["HUMAN approval, always"]:::human
+    M["Merge"]:::tool
+    TIER -->|T0| A0 --> CI
+    TIER -->|T1| A1 --> CI
+    TIER -->|T2| A2 --> CI
+    TIER -->|T3| A3 --> CI
+    CI -->|T0| M
+    CI -->|T1| B1 --> M
+    CI -->|T2| B2 --> C2 --> M
+    CI -->|T3| B3 --> C3 --> M
+```
+
+### (d) Review fan-out by changed paths
+
+```mermaid
+flowchart LR
+    classDef human fill:#ffd37a,stroke:#9a6b00,color:#000
+    classDef agent fill:#a9cdf5,stroke:#1f5fa8,color:#000
+    classDef tool fill:#a8e0b0,stroke:#23753a,color:#000
+    classDef gate fill:#fff,stroke:#d32f2f,stroke-width:3px,color:#000
+    CI["CI output: read, do not re-run"]:::tool --> P{"Which paths changed?"}:::gate
+    P -->|"auth, actions, rules, money"| SEC["security, strong at T3"]:::agent
+    P -->|"components, styles"| UI["ui, mid"]:::agent
+    P -->|"services, domain"| LOG["logic, mid"]:::agent
+    P -->|"new folders, imports"| ARC["architecture, mid"]:::agent
+    P -->|"guard or money tests"| TQ["test-quality, mid"]:::agent
+    SEC --> F{"Blockers?"}:::gate
+    UI --> F
+    LOG --> F
+    ARC --> F
+    TQ --> F
+    F -->|No| OK["Approver"]:::agent
+    F -->|Yes| FIX["Builder fixes, max 2 rounds"]:::agent
+    FIX -.->|"escalate after round 2"| HU["Human"]:::human
+```
+
+### (e) Fix loop and escalation
+
+```mermaid
+flowchart TD
+    classDef human fill:#ffd37a,stroke:#9a6b00,color:#000
+    classDef agent fill:#a9cdf5,stroke:#1f5fa8,color:#000
+    classDef tool fill:#a8e0b0,stroke:#23753a,color:#000
+    classDef gate fill:#fff,stroke:#d32f2f,stroke-width:3px,color:#000
+    F["Blocking findings with proof"]:::agent --> R{"Fix round used?"}:::gate
+    R -->|"0 or 1"| FX["Builder fixes, scoped to findings"]:::agent
+    FX --> CI["CI re-runs gates"]:::tool
+    CI --> RR["Same reviewer re-checks the findings only"]:::agent
+    RR --> C{"Clean?"}:::gate
+    C -->|Yes| OK["Approve"]:::agent
+    C -->|"No"| R
+    R -->|"2"| H["Escalate to human with open findings"]:::human
+    FX -.->|"builder cannot state the invariant"| UP["Raise builder role one step"]:::agent
+```
+
+Rules: max 2 fix rounds; fixes touch only the findings; a reviewer re-checks findings, not the whole diff; a
+finding a tool could have caught becomes a tool check; T3 never merges without a human.
+
+### Who does what (RACI-like)
+
+| Gate | Step | Human | Agent (model role) | Tool | Condition | Evidence |
+|---|---|---|---|---|---|---|
+| G0 | Request and classify | states request, confirms T3 | orchestrator (`mid`) picks tier | tier questions | always | tier line in plan |
+| G1 | Spec and abuse cases | approves | spec: `strong` at T3, `mid` at T2 | abuse-case template | T2 (tests listed), T3 (abuse cases) | approved spec, abuse case to test names |
+| G2 | Plan | OK for non-trivial work | `mid` writes numbered tasks | none | T1 to T3 | plan in `docs/plans/` with tier and reuse table |
+| G3 | Build with TDD | none | builder by tier: `small` T0/T1, `mid` T2/T3 | typecheck, changed tests (local) | always | red then green test, diff |
+| G4 | Tool gates | none | none (reads result) | lint, types, tests, diff coverage, depcruise, arch suite, build, bundle, SAST, gitleaks, audit; mutation on T3 (opt-in) | always, once in CI | CI run |
+| G5 | Specialist review | none | reviewers by path (table below) | CI output as input | T1 ui; T2/T3 per trigger | verdicts and findings with proof |
+| G6 | Release | approves at T3 (always); deploys rules and indexes | approver `strong` at T2; none at T0/T1 | branch ruleset | all merges | PR approval, green checks |
+| Feedback | Operate | triages | proposes tool checks for recurring findings | doctor, ratchets | after release | fewer findings of the same kind |
+
+### Reviewer roles
+
+| Reviewer | Trigger paths | Model | Checklist | Tool-first checks (read, not re-run) |
+|---|---|---|---|---|
+| security | auth, actions, rules, payments, public routes, uploads | `strong` T3, `mid` T2 | `security-review.md` (OWASP Web + API Top 10) | SAST, gitleaks, audit, rules tests, mutation |
+| ui | `src/components`, styles | `mid` | `ui-review.md` + `ui-consistency` | lint, style ratchet, visual regression |
+| logic | services, domain, state machines | `mid` | `logic-review.md` | unit/service tests, coverage |
+| architecture | new folders, cross-layer imports, actions | `mid` | `arch-review.md` | depcruise, arch suite |
+| test-quality | tests of guards, money, state | `mid` | `test-quality.md` | coverage, mutation report |
+
+Checklists live in `skills/factory-review/references/`.
+
+### Tier x step
+
+| Step | T0 docs/mechanical | T1 UI | T2 logic | T3 security/money/roles |
+|---|---|---|---|---|
+| Spec | none | short brief | spec with tests | spec with abuse cases, each a test |
+| Builder | `small` | `small` | `mid` | `mid` |
+| Tool gates in CI | required | required | required | required, plus mutation and SAST |
+| Reviewers | none | ui, once per batch | logic, others by path | all by path, `strong` security with OWASP lines |
+| Fix rounds | n/a | max 2 | max 2 | max 2, then human |
+| Approver | CI green | CI green | agent approver (`strong`) | **human, always** |
+
+---
+
 ## 1. Secure SDLC (SSDLC) Phase Mapping
 
 `@oneup4real/standards` aligns modern AI-assisted engineering with the classical **Secure Software Development Lifecycle (SSDLC)** (NIST SSDF SP 800-218, OWASP SAMM, Microsoft SDL):
@@ -66,14 +257,16 @@ graph LR
 
 ### Detailed Phase Breakdown
 
+G-numbers refer to the gates in [the delivery flow](#the-delivery-flow-who-does-what-when).
+
 | SSDLC Phase | Classical Activities (NIST / OWASP) | Threats & AI Failure Modes Mitigated | Enforcement Mechanism & Tools Used | Responsibility / Gate |
 |---|---|---|---|---|
-| **1. Requirements & Threat Modeling** | • Abuse case modeling<br>• Trust boundary definition<br>• Security requirements & compliance scope (GDPR/ISO 27001) | AI agents implementing features without considering auth boundaries, data privacy, or business logic abuse. | • `brainstorming` skill<br>• `writing-plans` (formal spec before code)<br>• Definition of Done (`AGENTS.global.md`) | **Human & AI Alignment**:<br>Human approves spec and acceptance criteria before implementation begins. |
-| **2. Secure Architecture & Design** | • Layered defense-in-depth<br>• Principle of Least Privilege<br>• Server-side token verification<br>• Zero-trust database design | Architecture erosion; UI components directly mutating databases; bypass of server-side authorization. | • `depcruise/layered.cjs` (Clean Architecture)<br>• Server action isolation (`src/server/actions`)<br>• Deny-by-default Firestore rules (`allow write: if false`) | **Architectural Rules**:<br>Machine-checked layer boundaries; domain layer remains pure. |
-| **3. Secure Coding & Shift-Left Dev** | • Test-Driven Development (TDD)<br>• Secret scanning on staged changes<br>• Static linting of security rules<br>• Strict typing & type safety | AI hallucinating code without tests; committing credentials, `.env` files, or internal PDFs; using `any` or `dangerouslySetInnerHTML`. | • **Husky hooks** (`pre-commit`, `pre-push`)<br>• **Gitleaks** (`gitleaks protect --staged`)<br>• `oneup-standards check-files`<br>• **ESLint Security Plugin** (`@oneup4real/standards/eslint/nextjs`)<br>• Strict TS (`tsconfig/nextjs.json`) | **Pre-Commit Gate**:<br>Local commit fails immediately if secrets, forbidden files, or lint errors are present. |
-| **4. Automated Security Verification (CI)** | • **SAST** (Static Application Security Testing)<br>• **SCA** (Software Composition Analysis)<br>• **AST Guard Inspection**<br>• **TDD & Diff Coverage**<br>• **Bundle Leak Detection**<br>• **Emulated Rules Testing** | Unguarded server endpoints; vulnerable dependencies; untested edge cases; sensitive markers in browser JavaScript. | • **SAST**: Semgrep / GitHub CodeQL<br>• **SCA**: `npm audit` + Dependabot<br>• **AST Security**: `arch/suite.js` (Action auth guards)<br>• **TDD Gates**: `check-tests-changed` & `check-diff-coverage >= 80%`<br>• **Bundle Audit**: `check-bundle`<br>• **Emulated Testing**: `@oneup4real/standards/firebase-testing` against local emulator | **Pull Request Gate**:<br>Automated reusable CI (`ci-node.yml`, `security.yml`). Unchecked code cannot merge. |
-| **5. Secure Release & Deployment** | • Branch protection<br>• Release gating & Four-Eyes principle<br>• Production security headers<br>• Blast radius containment | Unreviewed AI code pushed directly to production; missing HTTP defense headers; unintended rule deployment. | • GitHub Rulesets (block force push, require PRs & green checks)<br>• Next.js `securityHeaders` (CSP, HSTS, XFO)<br>• Human-only deployment rule for database security rules | **Release Gate**:<br>Human-in-the-loop review; status checks must pass; security rules deployed only by humans. |
-| **6. Operations & Fleet Governance** | • Anti-drift management<br>• Vulnerability patching<br>• Technical debt reduction (ratchets) | Repositories drifting from security standards; unpatched dependencies; growing legacy code debt. | • `oneup-standards doctor`<br>• `oneup-standards upgrade`<br>• Monotonic ratchets (`arch-allowlist.json`, `known-violations`)<br>• Weekly Dependabot updates & `standards-automerge` | **Continuous Monitoring**:<br>Ratchets can only shrink; PRs visibly flag configuration drift. |
+| **1. Requirements & Threat Modeling**<br>(G0, G1) | • Abuse case modeling<br>• Trust boundary definition<br>• Security requirements & compliance scope (GDPR/ISO 27001) | AI agents implementing features without considering auth boundaries, data privacy, or business logic abuse. | • `brainstorming` skill<br>• `writing-plans` (formal spec before code)<br>• Definition of Done (`AGENTS.global.md`) | **Human & AI Alignment**:<br>Human approves spec and acceptance criteria before implementation begins. |
+| **2. Secure Architecture & Design**<br>(G1, G2) | • Layered defense-in-depth<br>• Principle of Least Privilege<br>• Server-side token verification<br>• Zero-trust database design | Architecture erosion; UI components directly mutating databases; bypass of server-side authorization. | • `depcruise/layered.cjs` (Clean Architecture)<br>• Server action isolation (`src/server/actions`)<br>• Deny-by-default Firestore rules (`allow write: if false`) | **Architectural Rules**:<br>Machine-checked layer boundaries; domain layer remains pure. |
+| **3. Secure Coding & Shift-Left Dev**<br>(G3) | • Test-Driven Development (TDD)<br>• Secret scanning on staged changes<br>• Static linting of security rules<br>• Strict typing & type safety | AI hallucinating code without tests; committing credentials, `.env` files, or internal PDFs; using `any` or `dangerouslySetInnerHTML`. | • **Husky hooks** (`pre-commit`, `pre-push`)<br>• **Gitleaks** (`gitleaks protect --staged`)<br>• `oneup-standards check-files`<br>• **ESLint Security Plugin** (`@oneup4real/standards/eslint/nextjs`)<br>• Strict TS (`tsconfig/nextjs.json`) | **Pre-Commit Gate**:<br>Local commit fails immediately if secrets, forbidden files, or lint errors are present. |
+| **4. Automated Security Verification (CI)**<br>(G4, G5) | • **SAST** (Static Application Security Testing)<br>• **SCA** (Software Composition Analysis)<br>• **AST Guard Inspection**<br>• **TDD & Diff Coverage**<br>• **Bundle Leak Detection**<br>• **Emulated Rules Testing** | Unguarded server endpoints; vulnerable dependencies; untested edge cases; sensitive markers in browser JavaScript. | • **SAST**: Semgrep / GitHub CodeQL<br>• **SCA**: `npm audit` + Dependabot<br>• **AST Security**: `arch/suite.js` (Action auth guards)<br>• **TDD Gates**: `check-tests-changed` & `check-diff-coverage >= 80%`<br>• **Bundle Audit**: `check-bundle`<br>• **Emulated Testing**: `@oneup4real/standards/firebase-testing` against local emulator | **Pull Request Gate**:<br>Automated reusable CI (`ci-node.yml`, `security.yml`). Unchecked code cannot merge. |
+| **5. Secure Release & Deployment**<br>(G6) | • Branch protection<br>• Release gating & Four-Eyes principle<br>• Production security headers<br>• Blast radius containment | Unreviewed AI code pushed directly to production; missing HTTP defense headers; unintended rule deployment. | • GitHub Rulesets (block force push, require PRs & green checks)<br>• Next.js `securityHeaders` (CSP, HSTS, XFO)<br>• Human-only deployment rule for database security rules | **Release Gate**:<br>Human-in-the-loop review; status checks must pass; security rules deployed only by humans. |
+| **6. Operations & Fleet Governance**<br>(Feedback) | • Anti-drift management<br>• Vulnerability patching<br>• Technical debt reduction (ratchets) | Repositories drifting from security standards; unpatched dependencies; growing legacy code debt. | • `oneup-standards doctor`<br>• `oneup-standards upgrade`<br>• Monotonic ratchets (`arch-allowlist.json`, `known-violations`)<br>• Weekly Dependabot updates & `standards-automerge` | **Continuous Monitoring**:<br>Ratchets can only shrink; PRs visibly flag configuration drift. |
 
 ---
 
@@ -127,7 +320,7 @@ flowchart TD
     end
 
     subgraph P5["Phase 5: Secure Release & Deployment"]
-        CI_Job --> DualControl[Independent Reviewer Subagent\nFour-Eyes Code Verification]
+        CI_Job --> DualControl[Specialist Reviewers by tier\nFour-Eyes Verification]
         Sec_Job --> DualControl
         DualControl --> HumanApproval{Human Lead Review\n& PR Approval}
         HumanApproval -->|Merge to default branch| GitHubRuleset[GitHub Branch Ruleset\nBlock force push & require green checks]
@@ -166,7 +359,7 @@ Every tool incorporated into `@oneup4real/standards` is targeted at specific rea
 | **`@oneup4real/standards/next/headers`** | Release & Deployment | Clickjacking, MIME sniffing, cross-site scripting (XSS), missing HSTS/CSP. | **Runtime Defense**: Injects hardened production HTTP security headers. |
 | **`doctor` & `upgrade`** | Operations & Fleet | Configuration drift: projects initialized months ago missing new security patches and hook updates. | **Fleet Consistency**: Cryptographically tracks template drift and provides safe upgrades. |
 | **`ui-consistency` skill + style ratchet** | Design & Coding | AI styles each screen in isolation: one-off font sizes (`text-[10.5px]`), hand-built pills and modals next to existing primitives, drifting spacing and radii. | **UI Integrity**: Primitives are reused, tokens are enforced, and arbitrary style values can only decrease. |
-| **Superpowers Subagent Dual-Control** | Design & Coding | Single agent "cheating" its own evaluation, hallucinating test results, or deviating from plan. | **Four-Eyes Governance**: Separates the implementer agent from an independent, fresh-context reviewer agent. |
+| **Specialist reviewers by tier (`factory-review`)** | Design & Coding | Single agent "cheating" its own evaluation, hallucinating test results, or deviating from plan; blanket reviews that re-run what tools already prove. | **Four-Eyes Governance**: Separates the implementer from path-triggered, fresh-context specialist reviewers; T3 needs a human. |
 
 ### Defense-in-Depth: SAST vs. Linting vs. Testing
 
@@ -331,49 +524,20 @@ Then the human runs `npx oneup-standards baseline` once and commits `ui-style-ba
 
 ---
 
-## 5. Subagent Dual-Control Protocol
+## 5. Specialist Review Protocol (Dual Control)
 
-When AI coding tools (Claude Code, Antigravity, Cursor, Codex) execute non-trivial tasks in projects using `@oneup4real/standards`, they are bound by the **Subagent Dual-Control Protocol** defined in `AGENTS.global.md`:
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Human as Human Lead
-    participant Orchestrator as Orchestrator Agent
-    participant Implementer as Implementer Subagent
-    participant Reviewer as Reviewer Subagent (Adversarial)
-    participant CI as Machine Verification (Local / CI)
-
-    Human->>Orchestrator: Request Feature / Fix
-    Orchestrator->>Orchestrator: Phase 1: Break into atomic tasks (writing-plans)
-    
-    loop For Each Step in Plan
-        Orchestrator->>Implementer: Dispatch Task Step (Isolated Context)
-        Implementer->>Implementer: Write failing test first (TDD)
-        Implementer->>Implementer: Write minimal implementation
-        Implementer->>Implementer: Run tsc & vitest
-        Implementer-->>Orchestrator: Submit Diff & DoD Claims
-        
-        Orchestrator->>Reviewer: Dispatch Review (Diff + Spec only, fresh context)
-        Reviewer->>CI: Run tsc, lint, tests, arch checks
-        CI-->>Reviewer: Command Output Evidence
-        alt Findings / Regressions Detected
-            Reviewer-->>Orchestrator: Reject with Concrete Issues
-            Orchestrator->>Implementer: Scoped Fix Loop
-        else Passes All Gates
-            Reviewer-->>Orchestrator: Approve Step
-        end
-    end
-
-    Orchestrator->>CI: Phase 4: Full System Verification (npx oneup-standards ...)
-    CI-->>Orchestrator: Evidence Output
-    Orchestrator-->>Human: Present Terminal Proof & PR Ready
-```
+Non-trivial tasks in projects using `@oneup4real/standards` follow the protocol in `AGENTS.global.md` and the
+`factory-review` skill; the sequence is the delivery flow above (gates G0 to G6). In short: the implementer
+builds test-first, tools gate in CI once, and fresh-context specialist reviewers (triggered by changed paths,
+sized by risk tier) read that evidence and attack what tools cannot check.
 
 ### Core Rules for AI Agents
-- **No Self-Approval:** The agent that writes the implementation code must never approve its own step.
-- **Fresh-Context Skeptical Reviewer:** The reviewer subagent is launched with isolated context (only the spec, plan step, and git diff), preventing confirmation bias inherited from conversation history.
-- **Evidence Before Assertions:** Phrases like "this should work" or "all tests pass" are rejected without terminal output proof.
+- **No Self-Approval:** the agent that writes the code never approves it.
+- **Fresh-Context Skeptical Reviewer:** reviewers get only spec, diff, abuse cases and CI output, plus a specific attack brief (`reviewer-brief-template.md`).
+- **Tools Before Reviewers:** reviewers read CI output and never re-run gates or repeat tool findings.
+- **Max 2 Fix Rounds**, then escalation to the human with the open findings.
+- **T3 Needs a Human:** security, money, roles, public endpoints and data migrations are never merged on agent approval alone.
+- **Evidence Before Assertions:** "this should work" is rejected without CI or terminal output.
 
 ---
 
@@ -450,7 +614,7 @@ npx oneup-standards doctor
 
 #### 5. Standard-Owned Skills
 Some skills belong to the standard itself and ship inside `@oneup4real/standards` (`skills/`), currently
-`ui-consistency`. They are versioned with the package, override any plugin skill with the same name, and are
+`ui-consistency` and `factory-review` (risk tiers, model roles, specialist reviewer checklists, OWASP Web and API Top 10 review). They are versioned with the package, override any plugin skill with the same name, and are
 installed for both Antigravity and Claude Code by `sync-skills`. `doctor` reports them as missing or outdated
 after a package upgrade; `upgrade` or `sync-skills` refreshes them.
 
