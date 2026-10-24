@@ -2,6 +2,27 @@
 
 <!-- What does this change, and why? Link the issue if there is one. -->
 
+## Risk tier
+
+- [ ] T0 docs / mechanical  - [ ] T1 UI only  - [ ] T2 business logic  - [ ] T3 security, money, roles, public endpoint, data migration
+
+CI run (evidence): <!-- link to the green run -->
+
+### T3 only
+
+| Abuse case | Test that proves it is blocked |
+|---|---|
+| | |
+
+- [ ] OWASP Web Top 10 and API Security Top 10 answered, one line per applicable item (in the spec or below)
+
+**Human checklist (the merging human ticks these):**
+
+- [ ] I reviewed the diff myself
+- [ ] I ran the smoke test
+- [ ] Secrets and database/storage rules are untouched, or a human deploys the rules
+- [ ] Rollback plan: <!-- how to undo this -->
+
 ## Security & architecture
 
 - [ ] Every write goes UI → server action → service (no database writes from UI code)

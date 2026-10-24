@@ -58,6 +58,16 @@ describe('TDD enforcement in ci-node.yml', () => {
   it('PR template asks for test-first', async () => {
     expect(await fs.readFile('templates/consumer/.github/pull_request_template.md', 'utf8')).toMatch(/test first|failing test/i);
   });
+
+  it('PR template asks for the risk tier, CI evidence and the T3 human checklist', async () => {
+    const t = await fs.readFile('templates/consumer/.github/pull_request_template.md', 'utf8');
+    expect(t).toMatch(/Risk tier/);
+    for (const tier of ['T0', 'T1', 'T2', 'T3']) expect(t).toContain(tier);
+    expect(t).toMatch(/CI/);
+    expect(t).toMatch(/\| Abuse case \|/);
+    expect(t).toMatch(/OWASP/);
+    for (const item of [/reviewed the diff/i, /smoke test/i, /secrets.*rules|rules.*secrets/i, /rollback/i]) expect(t).toMatch(item);
+  });
 });
 
 describe('gitleaks in security.yml', () => {
