@@ -708,6 +708,8 @@ Run `npx oneup-standards upgrade` to synchronize configuration files.
 
 In CI, `oneup-standards doctor --warn-only` runs automatically on pull requests to highlight drift without failing the build.
 
+`doctor` also prints **hints** (never failures, exit code unchanged; GitHub notices with `--warn-only`): opt-in SAST rules, SCA and mutation testing not set up, specs without a risk tier or an "Abuse cases" section, `npm run test:unit` and the CI vitest step pointing at different test projects (heuristic), the standards block present in both the project `AGENTS.md` and `~/.agents/AGENTS.md` (read twice, costs tokens), and the `factory-review` skill not installed.
+
 ### Safe Synchronization with `upgrade`
 
 The `upgrade` command automatically updates outdated templates, creates missing files, appends missing hook lines, and refreshes the managed AI rules block in `AGENTS.md`:
