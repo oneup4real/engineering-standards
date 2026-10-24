@@ -137,3 +137,38 @@ describe('factory-review skill', () => {
     expect(await hintIds(dir, home)).not.toContain('factory-review-skill');
   });
 });
+
+describe('branch-protection hint', () => {
+  const run = (script) => async (cmd, args) => {
+    const key = Object.keys(script).find((k) => `${cmd} ${args.join(' ')}`.startsWith(k));
+    return { code: 0, stdout: '', stderr: '', ...(key ? script[key] : { code: 1 }) };
+  };
+  const script = {
+    'git remote get-url origin': { stdout: 'https://github.com/acme/shop.git' },
+    'gh --version': {},
+    'gh auth status': {},
+    'gh api repos/acme/shop --jq': { stdout: 'main' },
+    'gh api repos/acme/shop/branches/main/protection': { code: 1, stderr: 'HTTP 404 Branch not protected' },
+  };
+
+  it('is a hint, never a failure, and appears for an unprotected default branch', async () => {
+    const { dir, home } = await project();
+    const report = await inspectProject({ targetDir: dir, homeDir: home, run: run(script), ci: false });
+    expect(report.hints.map((h) => h.id)).toContain('branch-protection');
+    expect(report.items.every((i) => i.status === 'ok')).toBe(true);
+  });
+
+  it('is skipped in CI, without a runner and without a remote', async () => {
+    const { dir, home } = await project();
+    for (const opts of [{ run: run(script), ci: true }, {}, { run: run({}), ci: false }]) {
+      const report = await inspectProject({ targetDir: dir, homeDir: home, ...opts });
+      expect(report.hints.map((h) => h.id)).not.toContain('branch-protection');
+    }
+  });
+
+  it('points to the manual instruction when gh is not available', async () => {
+    const { dir, home } = await project();
+    const report = await inspectProject({ targetDir: dir, homeDir: home, run: run({ ...script, 'gh --version': { code: 127 } }), ci: false });
+    expect(report.hints.find((h) => h.id === 'branch-protection').message).toMatch(/Settings/);
+  });
+});
