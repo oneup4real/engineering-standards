@@ -62,61 +62,47 @@ used as credential, bypass via the edit action, inconsistent paid/approved state
 doing mechanical work, the same gates re-run by implementer, reviewer and controller, per-task reviews of
 mechanical UI work, unbounded fix loops, and recurring findings (test gaps, wrong numbers in docs) that a tool finds.
 
-Legend: amber = human, blue = agent, green = tool/CI, red outline = gate or decision. Model roles: `strong`, `mid`, `small` (never product names).
+Legend: amber = human, blue = agent, green = tool/CI, red outline = gate or decision; the node text names the actor. Swimlane view: see the RACI table. Model roles: `strong`, `mid`, `small` (never product names).
 
 ### (a) Big picture: gates G0 to G6
 
 ```mermaid
-flowchart TD
+flowchart LR
     classDef human fill:#ffd37a,stroke:#9a6b00,color:#000
     classDef agent fill:#a9cdf5,stroke:#1f5fa8,color:#000
     classDef tool fill:#a8e0b0,stroke:#23753a,color:#000
     classDef gate fill:#fff,stroke:#d32f2f,stroke-width:3px,color:#000
-    subgraph Human
-        H1["Request"]:::human
-        H2{"G1 Spec approved?"}:::gate
-        H3["G6 Human approval"]:::human
-        H4["Operate and feedback"]:::human
-    end
-    subgraph Orchestrator
-        O1["G0 Classify tier T0-T3"]:::agent
-        O2["G1 Spec and abuse cases"]:::agent
-        O3["G2 Plan"]:::agent
-        D3{"Tier T3?"}:::gate
-    end
-    subgraph Builder
-        B1["G3 Build with TDD"]:::agent
-    end
-    subgraph Reviewers
-        R1["G5 Specialist review by path"]:::agent
-        D2{"Approved?"}:::gate
-    end
-    subgraph Tools["Tools and CI"]
-        T1["G4 Tool gates in CI"]:::tool
-        D1{"All green?"}:::gate
-        T2["Merge and release"]:::tool
-    end
-    H1 --> O1 --> O2 --> H2
-    H2 -->|No| O2
-    H2 -->|Yes| O3 --> B1 --> T1 --> D1
-    D1 -->|No| B1
-    D1 -->|Yes| R1 --> D2
-    D2 -->|"No, max 2 rounds"| B1
-    D2 -->|Yes| D3
-    D3 -->|Yes| H3 --> T2
-    D3 -->|No| T2
-    T2 --> H4
-    H4 -.->|"recurring finding becomes a tool check"| H1
+    G0["G0 Human: request<br/>Agent: tier T0-T3"]:::human
+    G1["G1 Agent: spec<br/>and abuse cases"]:::agent
+    D1{"Human:<br/>approved?"}:::gate
+    G2["G2 Agent:<br/>plan"]:::agent
+    G3["G3 Agent: build<br/>with TDD"]:::agent
+    G4["G4 Tool:<br/>CI gates"]:::tool
+    D2{"Green?"}:::gate
+    G5["G5 Agent:<br/>specialist review"]:::agent
+    D3{"Passed?"}:::gate
+    D4{"T3?"}:::gate
+    G6["G6 Human:<br/>approval"]:::human
+    M["Tool: merge,<br/>release"]:::tool
+    G0 --> G1 --> D1
+    D1 -->|Yes| G2 --> G3 --> G4 --> D2
+    D2 -->|Yes| G5 --> D3
+    D3 -->|Yes| D4
+    D4 -->|Yes| G6 --> M
+    D4 -->|No| M
+    D1 -.->|No| G1
+    D2 -.->|"No: fix"| G3
+    D3 -.->|"No: fix, max 2, then human"| G3
 ```
 
 ### (b) Risk tier: which questions, in which order
 
 ```mermaid
-flowchart TD
+flowchart LR
     classDef agent fill:#a9cdf5,stroke:#1f5fa8,color:#000
     classDef gate fill:#fff,stroke:#d32f2f,stroke-width:3px,color:#000
     classDef t3 fill:#f5b5b5,stroke:#d32f2f,color:#000
-    S["New task"]:::agent --> Q1{"Security, money, roles, public endpoint, uploads or data migration?"}:::gate
+    S["New task"]:::agent --> Q1{"Security, money, roles, public endpoint or data migration?"}:::gate
     Q1 -->|Yes| T3["T3 high risk"]:::t3
     Q1 -->|No| Q2{"Business logic or state change?"}:::gate
     Q2 -->|Yes| T2["T2 logic"]:::agent
@@ -184,23 +170,20 @@ flowchart LR
 ### (e) Fix loop and escalation
 
 ```mermaid
-flowchart TD
+flowchart LR
     classDef human fill:#ffd37a,stroke:#9a6b00,color:#000
     classDef agent fill:#a9cdf5,stroke:#1f5fa8,color:#000
     classDef tool fill:#a8e0b0,stroke:#23753a,color:#000
     classDef gate fill:#fff,stroke:#d32f2f,stroke-width:3px,color:#000
-    F["Blocking findings with proof"]:::agent --> R{"Fix round used?"}:::gate
-    R -->|"0 or 1"| FX["Builder fixes, scoped to findings"]:::agent
-    FX --> CI["CI re-runs gates"]:::tool
-    CI --> RR["Same reviewer re-checks the findings only"]:::agent
-    RR --> C{"Clean?"}:::gate
+    F["Findings<br/>with proof"]:::agent --> FX["Builder fixes<br/>findings only"]:::agent
+    FX --> RC["CI gates, reviewer<br/>re-checks findings"]:::tool
+    RC --> C{"Clean?"}:::gate
     C -->|Yes| OK["Approve"]:::agent
-    C -->|"No"| R
-    R -->|"2"| H["Escalate to human with open findings"]:::human
-    FX -.->|"builder cannot state the invariant"| UP["Raise builder role one step"]:::agent
+    C -->|"No, round 1"| FX
+    C -->|"No, round 2"| H["Human decides"]:::human
 ```
 
-Rules: max 2 fix rounds; fixes touch only the findings; a reviewer re-checks findings, not the whole diff; a
+Rules: max 2 fix rounds (raise the builder role one step only after a failed round); fixes touch only the findings; a reviewer re-checks findings, not the whole diff; a
 finding a tool could have caught becomes a tool check; T3 never merges without a human.
 
 ### Who does what (RACI-like)
