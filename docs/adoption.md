@@ -51,12 +51,13 @@ Files that already exist are not overwritten (`--force` replaces and keeps `.bak
 npx --yes --package=github:oneup4real/engineering-standards#semver:^1.0.0 oneup-standards sync-agents --global
 ```
 
-This writes `~/.agents/AGENTS.md` and points Claude Code, Gemini and Codex to it. Re-run it after updating the standards.
+This writes a short bootstrap block (not the full standard) into `~/.agents/AGENTS.md` and points Claude Code, Gemini and Codex to it; Codex gets the same block in `~/.codex/AGENTS.md`. Your own text outside the block is kept, and an old full block is replaced. The full standard travels in each project's `AGENTS.md` (`init` or `sync-agents` in the project), so it is not read twice. Skills: `npx oneup-standards sync-skills`.
 
 ## GitHub settings per repository
 
 - Ruleset on the default branch: restrict deletions, block force pushes, require a pull request, and require status
   checks `ci / ci`, `security / gitleaks`, `security / audit`, and `security / semgrep` or `security / codeql`.
+- Quick setup of the first bullet: `npx oneup-standards protect-branch` (dry run), then `--apply`. Agents push feature branches and open pull requests; only a human merges.
 - Code security: secret scanning with push protection, Dependabot alerts and security updates.
 - For `updateMode: auto`: Settings → General → **Allow auto-merge**.
 

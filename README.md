@@ -106,6 +106,8 @@ flowchart TD
 
 At G6 agents push a feature branch and open a pull request; only a human merges (T3: with a recorded approval). `npx oneup-standards protect-branch` enforces this on GitHub, so a direct push to `main` is rejected.
 
+**Project = full standard, global = bootstrap.** The full standard lives in each project's `AGENTS.md` and travels with the repo. `sync-agents --global` writes only a short bootstrap block into `~/.agents/AGENTS.md` (what the block is, run `init` when a project lacks the standard, `sync-skills` for skills); your personal rules go outside the block. This avoids reading the same ~160 lines twice per request.
+
 ### (b) Risk tier: which questions, in which order
 
 ```mermaid
@@ -702,7 +704,7 @@ Run `npx oneup-standards upgrade` to synchronize configuration files.
 
 In CI, `oneup-standards doctor --warn-only` runs automatically on pull requests to highlight drift without failing the build.
 
-`doctor` also prints **hints** (never failures, exit code unchanged; GitHub notices with `--warn-only`): opt-in SAST rules, SCA and mutation testing not set up, specs without a risk tier or an "Abuse cases" section, `npm run test:unit` and the CI vitest step pointing at different test projects (heuristic), the standards block present in both the project `AGENTS.md` and `~/.agents/AGENTS.md` (read twice, costs tokens), and the `factory-review` skill not installed.
+`doctor` also prints **hints** (never failures, exit code unchanged; GitHub notices with `--warn-only`): opt-in SAST rules, SCA and mutation testing not set up, specs without a risk tier or an "Abuse cases" section, `npm run test:unit` and the CI vitest step pointing at different test projects (heuristic), the full standards block present in both the project `AGENTS.md` and `~/.agents/AGENTS.md` (read twice, costs tokens; the short global bootstrap does not count), the default branch without branch protection (`branch-protection`; needs `gh`, skipped in CI), and the `factory-review` skill not installed.
 
 ### Safe Synchronization with `upgrade`
 
@@ -780,6 +782,8 @@ Create a ruleset targeting the default branch:
 
 *(If you have the GitHub CLI installed, `npx oneup-standards init` can automatically create this ruleset for you).*
 
+Quicker, with classic branch protection: `npx oneup-standards protect-branch` prints the exact API payload and the click path (dry run). Add `--apply` to send it through `gh`. Flags: `--branch main`, `--checks "ci / ci,security / audit"` (default: the check runs of the latest commit, if `gh` is available), `--approvals 0` (a human merges; raise it for a second reviewer), `--include-admins` (admins cannot bypass either). It needs admin rights, and private repositories need a paid GitHub plan. `doctor` hints when the default branch is unprotected (never in CI).
+
 ---
 
 ## 11. What Happens When (Pipeline Breakdown)
@@ -824,7 +828,8 @@ All commands are available via `npx oneup-standards <command>`:
 | `sync-skills` | `[--project] [--dry-run]` | Synchronizes plugin skills (`superpowers`, `frontend-design`, `superdesign`, …) into Antigravity (`~/.gemini/config/skills`) and installs the package's own skills (`ui-consistency`) for Antigravity and Claude Code (`~/.claude/skills`). |
 | `check-skills` | none | Verifies required AI skills (`test-driven-development`, `brainstorming`, `superdesign`, etc.) are installed in Antigravity. |
 | `baseline` | none | Generates `.dependency-cruiser-known-violations.json`, `.eslint-suppressions.json` and, when `uiStyleRatchet` is configured, the UI style baseline, freezing existing violations into monotonic ratchets. |
-| `sync-agents` | `[--global]` | Refreshes managed shared rules in `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` (`--global` updates `~/.agents/AGENTS.md`). |
+| `sync-agents` | `[--global]` | Refreshes managed shared rules in `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`. `--global` writes only a short bootstrap block into `~/.agents/AGENTS.md` (and `~/.codex/AGENTS.md`), replacing an old full block and keeping your text. |
+| `protect-branch` | `[--branch main] [--checks a,b] [--approvals 0] [--include-admins] [--apply]` | Dry run by default: prints the GitHub branch-protection payload and the click path. `--apply` sends it with `gh` (admin rights; private repos need a paid plan). |
 | `check-files` | `[paths...]` | Fails if specified paths (default: staged files) contain office docs, keys, or `.env` files. |
 | `check-bundle` | `[--dir <path>]` | Scans production JavaScript bundles for confidential markers configured in `.standardsrc.json`. |
 | `check-tests-changed` | `--base <git-ref>` | Enforces TDD by failing if source code changed without corresponding test modifications. |

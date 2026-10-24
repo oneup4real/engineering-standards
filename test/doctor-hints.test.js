@@ -110,15 +110,24 @@ describe('test:unit equals the CI test project', () => {
 });
 
 describe('duplicated standards text', () => {
-  it('hints when the managed block is in the project AGENTS.md and in the global file', async () => {
+  it('hints when the FULL standard is in the project AGENTS.md and in the global file', async () => {
     const { dir, home } = await project();
     expect(await hintIds(dir, home)).not.toContain('duplicate-standards');
-    const { syncAgents } = await import('../lib/sync-agents.js');
-    await syncAgents({ targetDir: dir, global: true, homeDir: home });
+    const { upsertManagedBlock } = await import('../lib/managed-block.js');
+    const rules = await fs.readFile(path.join(import.meta.dirname, '..', 'agents', 'AGENTS.global.md'), 'utf8');
+    await write(home, '.agents/AGENTS.md', upsertManagedBlock(null, rules));
     const report = await inspectProject({ targetDir: dir, homeDir: home });
     const hint = report.hints.find((h) => h.id === 'duplicate-standards');
     expect(hint?.message).toMatch(/twice/);
     expect(hint?.message).toMatch(/tokens/);
+    expect(hint?.message).toMatch(/sync-agents --global/);
+  });
+
+  it('no hint when the global block is the short bootstrap form', async () => {
+    const { dir, home } = await project();
+    const { syncAgents } = await import('../lib/sync-agents.js');
+    await syncAgents({ targetDir: dir, global: true, homeDir: home });
+    expect(await hintIds(dir, home)).not.toContain('duplicate-standards');
   });
 });
 
