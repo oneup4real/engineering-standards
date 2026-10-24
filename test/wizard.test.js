@@ -145,3 +145,36 @@ describe('runWizard bundle markers', () => {
     expect(await fs.readFile(path.join(dir, '.github/workflows/ci.yml'), 'utf8')).toContain('bundle-check: true');
   });
 });
+
+describe('wizard readiness checklist', () => {
+  it('--yes prints the checklist and the human to-do list without risky calls', async () => {
+    const dir = await repo();
+    const d = deps();
+    const io = makeIo(dir);
+    expect(await runWizard(io, { ...d, yes: true })).toBe(0);
+    expect(io.out).toMatch(/Readiness checklist/);
+    expect(io.out).toMatch(/What you still have to do yourself/);
+    expect(io.out).toMatch(/oneup-standards finish/);
+    expect(d.calls.some((c) => /sync-skills|gh /.test(c))).toBe(false);
+  });
+
+  it('offers to sync missing skills and runs it only on yes', async () => {
+    const dir = await repo();
+    const yes = deps({ answers: { syncSkills: true } });
+    await runWizard(makeIo(dir), yes);
+    expect(yes.calls).toContain('npx oneup-standards sync-skills');
+    const dir2 = await repo();
+    const no = deps({ answers: { syncSkills: false } });
+    await runWizard(makeIo(dir2), no);
+    expect(no.calls).not.toContain('npx oneup-standards sync-skills');
+  });
+
+  it('uses the injected runner (gh state) and never the network by default', async () => {
+    const dir = await repo();
+    const d = { ...deps(), run: async (cmd, args) => ({ code: `${cmd} ${args[0]}` === 'gh --version' ? 0 : 1, stdout: '', stderr: '' }) };
+    const io = makeIo(dir);
+    await runWizard(io, { ...d, yes: true });
+    expect(io.out).toMatch(/ok\s+GitHub CLI/);
+    expect(io.out).toMatch(/missing\s+gh signed in/);
+  });
+});
