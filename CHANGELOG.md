@@ -1,16 +1,18 @@
 # Changelog
 
-## [1.7.0] - Unreleased
+## [1.7.0] - 2026-10-24
 
 ### Added
 - **`factory-review` skill** (`skills/factory-review/`): risk tiers T0-T3, model roles (`strong`, `mid`, `small`), path-triggered specialist reviewers (security, ui, logic, architecture, test-quality) with checklists, reviewer brief and abuse-case templates. Security review covers OWASP Web Top 10 (2021) and API Security Top 10 (2023), one line per item.
 - README: "The delivery flow: who does what, when" with five diagrams, gates G0-G6, a RACI table, reviewer roles and a tier x step table; SSDLC phases link to the gates.
 - `AGENTS.global.md`: risk tiers, model roles, tool-first gates (full gate set runs once in CI, reviewers read the evidence), max 2 fix rounds, T3 needs a human approval.
-- Opt-in for adopting projects: SAST (Semgrep or CodeQL) and mutation testing (Stryker).
+- **Opt-in security templates** (`templates/optional/`, `npx oneup-standards add <sast|sca|mutation|dast|all>` or `init --with ...`): Semgrep rules for Next.js server actions (missing auth guard, `dangerouslySetInnerHTML`, unsanitized HTML sinks, `Math.random()` for secrets, `error.message` passthrough), `npm audit` severity gate, Stryker config with a changed-files CI job, nightly OWASP ZAP baseline. All report only until a repository variable enables blocking. The Semgrep rules were validated for structure only; `semgrep --test` ran nowhere in release (semgrep not installed).
+- **`risk-tier` command**: classifies the diff into T0-T3 by changed paths (globs configurable under `riskTiers` in `.standardsrc.json`), prints tier, reviewers and whether a human approval is required; `--json` for CI.
+- **`doctor` hints** (never failures): opt-in SAST/SCA/mutation missing, specs without risk tier or abuse cases, `test:unit` vs CI test project, standards block duplicated in project and global `AGENTS.md`, `factory-review` skill not installed.
 
 ### Changed
 - `AGENTS.global.md` Phase 3 is now specialist review by tier instead of a blanket reviewer who re-runs all checks; the Definition of Done is run once in CI. README section 5 replaces the dual-control sequence diagram.
-- Notes: tooling (templates, doctor checks, adding `factory-review` to the required skills) follows in the same release.
+- `factory-review` is a required skill (pre-flight in `AGENTS.global.md` and README). Notes: `doctor` reports it as missing for Claude Code until you run `upgrade` or `sync-skills`.
 
 ## [1.6.0] - 2026-10-19
 
