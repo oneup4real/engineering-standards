@@ -140,6 +140,24 @@ describe('runProtectBranch --apply', () => {
   });
 });
 
+describe('free plan on a private repository (403 Upgrade to GitHub Pro)', () => {
+  const UPGRADE = 'HTTP 403: Upgrade to GitHub Pro or make this repository public to enable this feature.';
+
+  it('protect-branch --apply explains it and exits 2 without crashing', async () => {
+    const io = makeIo('/x', {});
+    const run = mockRun({ ...REMOTE, ...GH_OK, 'gh api -X PUT': { code: 1, stderr: UPGRADE } });
+    expect(await runProtectBranch(['--apply', '--checks', 'ci'], io, { run })).toBe(2);
+    expect(io.err).toContain('not available on this plan (private repo, free plan)');
+    expect(io.err).toContain('local guard');
+    expect(io.err).toContain('GitHub Pro');
+  });
+
+  it('doctor hint stays silent (the checklist line explains it)', async () => {
+    const run = mockRun({ ...REMOTE, ...GH_OK, 'gh api repos/acme/shop --jq': { stdout: 'main\n' }, 'gh api repos/acme/shop/branches/main/protection': { code: 1, stderr: UPGRADE } });
+    expect(await protectionHint({ run, ci: false })).toBeNull();
+  });
+});
+
 describe('protectionHint (doctor)', () => {
   const api = (r) => ({ ...REMOTE, ...GH_OK, 'gh api repos/acme/shop --jq': { stdout: 'main\n' }, 'gh api repos/acme/shop/branches/main/protection': r });
   const protectedJson = (o) => ({ stdout: JSON.stringify(o) });

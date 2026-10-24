@@ -69,6 +69,32 @@ describe('collectReadiness', () => {
     expect(byId(items, 'branch-protection').command).toBe('npx oneup-standards protect-branch');
   });
 
+  it('branch protection is n/a with the local-guard wording on a private repo, free plan (403)', async () => {
+    const { dir, home } = await project();
+    const script = { ...FULL, 'gh api repos/acme/shop/branches/main/protection': { code: 1, stderr: 'HTTP 403: Upgrade to GitHub Pro or make this repository public to enable this feature.' } };
+    const items = await collectReadiness({ targetDir: dir, homeDir: home, run: runner(script), ci: false });
+    expect(byId(items, 'branch-protection').state).toBe('n/a');
+    expect(formatReadiness(items)).toContain('n/a      Branch protection        not available on this plan (private repo, free plan): the local guard is your protection; GitHub Pro enables protect-branch');
+  });
+
+  it('local default-branch guard: ok with the pre-push hook and the default config', async () => {
+    const { dir, home } = await project();
+    const items = await collectReadiness({ targetDir: dir, homeDir: home, run: runner(FULL), ci: false });
+    expect(byId(items, 'local-guard').label).toBe('Local default-branch guard');
+    expect(byId(items, 'local-guard').state).toBe('ok');
+  });
+
+  it('local default-branch guard: missing without the hook or with protectDefaultBranch false', async () => {
+    const { dir, home } = await project();
+    await fs.writeFile(path.join(dir, '.standardsrc.json'), JSON.stringify({ hooks: { protectDefaultBranch: false } }));
+    let items = await collectReadiness({ targetDir: dir, homeDir: home, run: runner(FULL), ci: false });
+    expect(byId(items, 'local-guard').state).toBe('missing');
+    const empty = await tempDir();
+    items = await collectReadiness({ targetDir: empty, homeDir: home, run: runner(), ci: false });
+    expect(byId(items, 'local-guard').state).toBe('missing');
+    expect(byId(items, 'local-guard').command).toBe('npx oneup-standards upgrade');
+  });
+
   it('in CI no external tool is called and GitHub items are n/a', async () => {
     const { dir, home } = await project();
     const run = runner(FULL);
