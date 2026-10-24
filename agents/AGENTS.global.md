@@ -47,8 +47,7 @@ Every non-trivial task (more than a single 5-line edit) MUST follow this structu
    - Reviewers READ the CI/tool output and review only what tools cannot check; they do not re-run gates.
    - Skeptical posture: verify against the spec and abuse cases, check regressions, drift, untyped `any`, missing tests.
    - Checks UI changes against the project's UI catalog: primitives reused, no arbitrary style values outside the primitives folder, no duplicated components.
-   - Findings go back to the implementer. Max 2 fix rounds, then escalate to the human with the open findings.
-   - Only after the reviewers approve may the orchestrator advance.
+   - Findings go back to the implementer. Max 2 fix rounds, then escalate to the human. Advance only after approval.
 
 4. **Phase 4: Final Verification & Evidence (`verification-before-completion`):**
    - Locally run only the fast checks (typecheck, changed tests). The full gate set (lint, tests, coverage, depcruise, build, bundle, SAST) runs once in CI; cite its output.
@@ -79,6 +78,7 @@ Classify every task at the start and state the tier in the plan. The highest mat
 - Tools before agents: lint, types, tests, coverage, depcruise, SAST, secret scan, bundle check decide first; an LLM reviewer never repeats what a tool proves.
 - `npx oneup-standards risk-tier --base origin/main` classifies the diff and names the reviewers; use it at G0 and again before review.
 - Review triggers by path (auth, rules, actions, payments, money, `src/components`, `src/server`); every T3 review answers OWASP Web Top 10 and API Security Top 10 with one line per applicable item.
+- Agents never push to the default branch and never merge. They push a feature branch and open a pull request; a human merges. T3 requires human approval in the PR. Direct pushes to main deploy to production in many projects.
 - `npm run test:unit` must run the same test project as CI. Numbers and counts claimed in docs must be verified by script where possible.
 
 ## 2. Architecture

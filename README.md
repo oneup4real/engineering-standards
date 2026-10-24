@@ -99,10 +99,12 @@ flowchart TD
     D --> E{"Passed?"}:::gate
     E -.->|"No: fix, max 2,<br/>then human"| A
     E -->|Yes| F{"T3?"}:::gate
-    F -->|Yes| G["G6 Human:<br/>approval"]:::human
-    F -->|No| H["G6 Tool: merge,<br/>release"]:::tool
+    F -->|Yes| G["G6 Human:<br/>approves PR"]:::human
+    F -->|No| H["G6 Human:<br/>merges PR"]:::human
     G --> H
 ```
+
+At G6 agents push a feature branch and open a pull request; only a human merges (T3: with a recorded approval). `npx oneup-standards protect-branch` enforces this on GitHub, so a direct push to `main` is rejected.
 
 ### (b) Risk tier: which questions, in which order
 
