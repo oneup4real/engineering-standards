@@ -5,21 +5,21 @@ Read first: SAST, secret-scan, audit, rules-test and mutation CI output. Do not 
 Value comes from a specific ATTACK brief, not a generic checklist: name the assets and try to break them.
 
 ## Method
-1. **Enumerate every write path** (actions, API routes, rules, scheduled jobs, imports, edit/bulk variants) and
+1. **SEC-1** **Enumerate every write path** (actions, API routes, rules, scheduled jobs, imports, edit/bulk variants) and
    for each: who can call it (anonymous, token holder, any signed-in, role X)? Is that what the spec says?
    The edit/update twin of a guarded create is the usual bypass.
-2. **Real role lookup in tests.** Authorization tests call the real role resolution or the emulator, never a
+2. **SEC-2** **Real role lookup in tests.** Authorization tests call the real role resolution or the emulator, never a
    mocked `isAdmin`. Anonymous sessions are not staff.
-3. **Mutation-check the guards.** Remove or invert each guard once (or run the mutation tool); a test must go red.
+3. **SEC-3** **Mutation-check the guards.** Remove or invert each guard once (or run the mutation tool); a test must go red.
    Surviving mutants are findings.
-4. **Real-browser fuzz for sanitizers.** Feed XSS payload lists through every stored field and render the page in
+4. **SEC-4** **Real-browser fuzz for sanitizers.** Feed XSS payload lists through every stored field and render the page in
    a real browser; assert nothing executes. Unit tests of the sanitizer alone do not count.
-5. **Input bounds.** Every string trimmed and length-capped, numbers ranged, enums closed, arrays bounded, files typed and sized.
-6. **Idempotency of public actions.** Double submit and retry produce one effect.
-7. **Rate limits** on every unauthenticated endpoint; reduced view models (no PII) in responses.
-8. **Credentials.** A short or guessable code is never a credential; tokens are long, random, scoped, expirable.
-9. **State consistency.** Look for combinations the model forbids (paid but not approved).
-10. Secrets never in client-exposed variables; links accept only `https:` (and listed schemes).
+5. **SEC-5** **Input bounds.** Every string trimmed and length-capped, numbers ranged, enums closed, arrays bounded, files typed and sized.
+6. **SEC-6** **Idempotency of public actions.** Double submit and retry produce one effect.
+7. **SEC-7** **Rate limits** on every unauthenticated endpoint; reduced view models (no PII) in responses.
+8. **SEC-8** **Credentials.** A short or guessable code is never a credential; tokens are long, random, scoped, expirable.
+9. **SEC-9** **State consistency.** Look for combinations the model forbids (paid but not approved).
+10. **SEC-10** Secrets never in client-exposed variables; links accept only `https:` (and listed schemes).
 
 ## OWASP Web Top 10 (2021) in this stack
 
