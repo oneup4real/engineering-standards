@@ -181,3 +181,33 @@ describe('branch-protection hint', () => {
     expect(report.hints.find((h) => h.id === 'branch-protection').message).toMatch(/Settings/);
   });
 });
+
+describe('agent merge deny rule', () => {
+  const settings = (deny) => JSON.stringify({ permissions: { deny } });
+
+  it('hints when .claude/settings.json exists without a gh pr merge deny rule', async () => {
+    const { dir, home } = await project();
+    expect(await hintIds(dir, home)).not.toContain('agent-merge-deny');
+    await write(dir, '.claude/settings.json', settings(['Read(.env)']));
+    const report = await inspectProject({ targetDir: dir, homeDir: home });
+    const hint = report.hints.find((h) => h.id === 'agent-merge-deny');
+    expect(hint.message).toContain('Bash(gh pr merge:*)');
+    expect(report.items.every((i) => i.status === 'ok')).toBe(true);
+  });
+
+  it('silent when the rule exists in settings.json or settings.local.json', async () => {
+    const a = await project();
+    await write(a.dir, '.claude/settings.json', settings(['Bash(gh pr merge:*)']));
+    expect(await hintIds(a.dir, a.home)).not.toContain('agent-merge-deny');
+    const b = await project();
+    await write(b.dir, '.claude/settings.json', '{}');
+    await write(b.dir, '.claude/settings.local.json', settings(['Bash(gh pr merge:*)']));
+    expect(await hintIds(b.dir, b.home)).not.toContain('agent-merge-deny');
+  });
+
+  it('ignores unreadable settings files', async () => {
+    const { dir, home } = await project();
+    await write(dir, '.claude/settings.json', '{not json');
+    expect(await hintIds(dir, home)).toContain('agent-merge-deny');
+  });
+});
