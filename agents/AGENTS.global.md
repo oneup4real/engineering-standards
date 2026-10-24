@@ -37,23 +37,20 @@ Every non-trivial task (more than a single 5-line edit) MUST follow this structu
    - Save the plan in `docs/plans/` or `docs/superpowers/plans/`.
 
 2. **Phase 2: Step-by-Step Execution via Implementer Subagents (`executing-plans`):**
-   - For EACH task in the plan, dispatch a dedicated **Implementer Subagent**.
-   - The Implementer works in isolation: writes the failing test first (TDD), implements minimal code, runs typecheck and unit tests, and verifies the specific DoD for that step.
-   - The Implementer NEVER self-approves.
+   - For each task, dispatch an **Implementer Subagent** (model role by tier, see below).
+   - It works in isolation: failing test first (TDD), minimal code, fast local checks, the step's DoD. It NEVER self-approves.
 
-3. **Phase 3: Independent Reviewer Subagent (Dual Control / Four-Eyes Rule):**
-   - Immediately upon completion of an implementer task, dispatch a separate **Reviewer Subagent**.
-   - The Reviewer operates with a skeptical posture:
-     - Verifies code against the original spec and layer architecture rules.
-     - Runs `npx tsc --noEmit` and the relevant test suite directly.
-     - Checks for regressions, drift, untyped `any`, and missing tests.
-     - Checks UI changes against the project's UI catalog: primitives reused, no arbitrary style values outside the primitives folder, no duplicated components.
-   - If the Reviewer finds gaps, dispatch a **Scoped Fix & Re-Review** cycle until green.
-   - ONLY after the Reviewer approves may the main orchestrator advance to the next step.
+3. **Phase 3: Specialist Review (Four-Eyes, by tier; details in the `factory-review` skill):**
+   - The reviewer is never the implementer and starts with fresh context (spec, diff, CI output).
+   - Reviewers are triggered by changed paths, not by default: security, ui, logic, architecture, test-quality.
+   - Reviewers READ the CI/tool output and review only what tools cannot check; they do not re-run gates.
+   - Skeptical posture: verify against the spec and abuse cases, check regressions, drift, untyped `any`, missing tests.
+   - Checks UI changes against the project's UI catalog: primitives reused, no arbitrary style values outside the primitives folder, no duplicated components.
+   - Findings go back to the implementer. Max 2 fix rounds, then escalate to the human with the open findings.
+   - Only after the reviewers approve may the orchestrator advance.
 
-4. **Phase 4: Final System Verification & Evidence (`verification-before-completion`):**
-   - Run full project verification (`tsc`, lint, build, tests, dependency-cruiser).
-   - Present concrete terminal output as evidence before completion.
+4. **Phase 4: Final Verification & Evidence (`verification-before-completion`):**
+   - Locally run only the fast checks (typecheck, changed tests). The full gate set (lint, tests, coverage, depcruise, build, bundle, SAST) runs once in CI; cite its output.
 
 5. **Universal Rules:**
    - **Clarify before coding.** If a requirement or compliance interpretation is unclear, ask.
@@ -65,6 +62,22 @@ Every non-trivial task (more than a single 5-line edit) MUST follow this structu
    - **Refactor UI only behind a visual baseline.** Moving existing screens onto primitives or tokens must not change how they look: screenshot baseline first, zero pixel diff after, and never update snapshots without the human's approval.
 
 If Superpowers skills are available, always activate: `brainstorming`, `writing-plans`, `executing-plans`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `requesting-code-review`.
+
+## 1b. Risk tiers, model roles, tool-first (skill `factory-review`)
+
+Classify every task at the start and state the tier in the plan. The highest matching tier wins.
+
+| Tier | Scope | Spec | Builder | Review | Merge |
+|---|---|---|---|---|---|
+| T0 | docs, formatting, mechanical edits | none | `small` | tools only | CI green |
+| T1 | UI only, no logic | short | `small` | tools + ui (once per batch) | CI green |
+| T2 | business logic | spec + tests | `mid` | tools + logic, test-quality, architecture as triggered | CI green + approver |
+| T3 | security, money, roles, public endpoint, data migration | spec with abuse cases, each becomes a test | `mid` | all specialists, `strong` security review | **human approval before merge/release, always** |
+
+- Model roles, never product names: `strong` = spec, architecture, T3 security review, final approver; `mid` = T2/T3 builder, standard reviewers; `small` = mechanical edits, T0/T1 builder, doc and format fixes. Escalate a role only after a failed round.
+- Tools before agents: lint, types, tests, coverage, depcruise, SAST, secret scan, bundle check decide first; an LLM reviewer never repeats what a tool proves.
+- Review triggers by path (auth, rules, actions, payments, money, `src/components`, `src/server`); every T3 review answers OWASP Web Top 10 and API Security Top 10 with one line per applicable item.
+- `npm run test:unit` must run the same test project as CI. Numbers and counts claimed in docs must be verified by script where possible.
 
 ## 2. Architecture
 
@@ -121,7 +134,7 @@ assume the target architecture already exists.
 
 ## 5. Definition of Done
 
-Run these and show the output. Every one must pass:
+Every one must pass. CI runs them once; agents run the fast ones locally and cite the CI output instead of re-running:
 
 ```bash
 npm run lint
