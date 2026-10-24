@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.7.0] - Unreleased
+
+### Added
+- **`factory-review` skill** (`skills/factory-review/`): risk tiers T0-T3, model roles (`strong`, `mid`, `small`), path-triggered specialist reviewers (security, ui, logic, architecture, test-quality) with checklists, reviewer brief and abuse-case templates. Security review covers OWASP Web Top 10 (2021) and API Security Top 10 (2023), one line per item.
+- README: "The delivery flow: who does what, when" with five diagrams, gates G0-G6, a RACI table, reviewer roles and a tier x step table; SSDLC phases link to the gates.
+- `AGENTS.global.md`: risk tiers, model roles, tool-first gates (full gate set runs once in CI, reviewers read the evidence), max 2 fix rounds, T3 needs a human approval.
+- Opt-in for adopting projects: SAST (Semgrep or CodeQL) and mutation testing (Stryker).
+
+### Changed
+- `AGENTS.global.md` Phase 3 is now specialist review by tier instead of a blanket reviewer who re-runs all checks; the Definition of Done is run once in CI. README section 5 replaces the dual-control sequence diagram.
+- Notes: tooling (templates, doctor checks, adding `factory-review` to the required skills) follows in the same release.
+
 ## [1.6.0] - 2026-10-19
 
 ### Added
