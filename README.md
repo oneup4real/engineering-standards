@@ -104,7 +104,9 @@ flowchart TD
     G --> H
 ```
 
-At G6 agents push a feature branch and open a pull request; only a human merges (T3: with a recorded approval). `npx oneup-standards protect-branch` enforces this on GitHub, so a direct push to `main` is rejected.
+At G6 agents push a feature branch and `npx oneup-standards pr` opens the pull request (body: your template, the computed risk tier, reviewers and commits; without `gh` it prints the compare link and the text to paste). Only a human merges (T3: with a recorded approval); `pr` never merges. `npx oneup-standards protect-branch` enforces this on GitHub, so a direct push to `main` is rejected. To stop Claude Code from merging, add `Bash(gh pr merge:*)` to `permissions.deny` in `.claude/settings.json` (`doctor` hints when it is missing).
+
+After you merged on GitHub, run `npx oneup-standards finish` (dry run) and `--apply`: it fetches, fast-forwards the default branch and deletes the local branch only when it is proven done (merged by ancestry, a merged pull request via `gh`, or every commit already on the default branch by patch-id). `--remote` also deletes `origin/<branch>`; `--worktrees` removes finished worktrees without uncommitted changes. Tip: enable GitHub Settings > General > "Automatically delete head branches". Pitfall: a squash or rebase merge creates new commits, so git calls the original branch "not merged" and `git branch -d` refuses; `finish` checks the pull request or patch-ids first and only then uses `-D`.
 
 **Project = full standard, global = bootstrap.** The full standard lives in each project's `AGENTS.md` and travels with the repo. `sync-agents --global` writes only a short bootstrap block into `~/.agents/AGENTS.md` (what the block is, run `init` when a project lacks the standard, `sync-skills` for skills); your personal rules go outside the block. This avoids reading the same ~160 lines twice per request.
 
@@ -823,12 +825,14 @@ All commands are available via `npx oneup-standards <command>`:
 | Command | Arguments / Flags | Description |
 |---|---|---|
 | `init` | `[--yes] [--with <features>]` | Interactive setup wizard for new or existing projects (`--yes` accepts recommended answers). |
-| `doctor` | `[--warn-only]` | Diagnoses configuration drift, missing hooks, outdated templates, AI skills, and displays active monotonic ratchets / technical debt. |
+| `doctor` | `[--warn-only]` | Diagnoses configuration drift, missing hooks, outdated templates, AI skills, displays active monotonic ratchets / technical debt and a readiness checklist (OK / missing / n/a, exact command per item, what you still do yourself). |
 | `upgrade` | `[--merge] [--force] [--dry-run]` | Safely synchronizes template files, hooks, and AI rules. Uses `--merge` to combine customized files, or `--force` to replace. |
 | `sync-skills` | `[--project] [--dry-run]` | Synchronizes plugin skills (`superpowers`, `frontend-design`, `superdesign`, …) into Antigravity (`~/.gemini/config/skills`) and installs the package's own skills (`ui-consistency`) for Antigravity and Claude Code (`~/.claude/skills`). |
 | `check-skills` | none | Verifies required AI skills (`test-driven-development`, `brainstorming`, `superdesign`, etc.) are installed in Antigravity. |
 | `baseline` | none | Generates `.dependency-cruiser-known-violations.json`, `.eslint-suppressions.json` and, when `uiStyleRatchet` is configured, the UI style baseline, freezing existing violations into monotonic ratchets. |
 | `sync-agents` | `[--global]` | Refreshes managed shared rules in `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`. `--global` writes only a short bootstrap block into `~/.agents/AGENTS.md` (and `~/.codex/AGENTS.md`), replacing an old full block and keeping your text. |
+| `pr` | `[--title t] [--draft] [--base b] [--push]` | Opens a pull request from the current feature branch (refuses on the default branch). Body: PR template + computed risk tier + commits. Uses `gh pr create` when signed in, otherwise prints the compare URL and the text. Pushes only with `--push`. Never merges. |
+| `finish` | `[--apply] [--branch n] [--remote] [--worktrees]` | After a merge: fetch, fast-forward the default branch, delete the local branch if proven done (dry run by default; refuses with uncommitted changes; never deletes unproven branches). |
 | `protect-branch` | `[--branch main] [--checks a,b] [--approvals 0] [--include-admins] [--apply]` | Dry run by default: prints the GitHub branch-protection payload and the click path. `--apply` sends it with `gh` (admin rights; private repos need a paid plan). |
 | `check-files` | `[paths...]` | Fails if specified paths (default: staged files) contain office docs, keys, or `.env` files. |
 | `check-bundle` | `[--dir <path>]` | Scans production JavaScript bundles for confidential markers configured in `.standardsrc.json`. |

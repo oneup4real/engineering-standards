@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.7.1] - 2026-10-24
+
+### Added
+- **Pull request workflow**: rule in `AGENTS.global.md` that agents never push to the default branch and never merge (they push a feature branch and open a PR; T3 needs human approval in the PR). README G6 and the Part 2 diagram say so.
+- `pr` command: opens the pull request from the feature branch (template + computed risk tier + commits; `gh pr create` or compare URL and text; `--push`, `--draft`, `--base`, `--title`). Never merges.
+- `finish` command: after a merge, fetch, fast-forward the default branch and delete branches proven done (ancestry, merged PR via `gh`, or patch-id heuristic); dry run by default; `--remote`, `--worktrees`.
+- `protect-branch` command: prints (dry run) or applies (`--apply`, via `gh`) GitHub branch protection: PR required, strict status checks, no force push or deletion.
+- PR template: risk tier, CI evidence, T3 abuse-case table and human checklist.
+- `doctor`: readiness checklist (also at the end of `init`) with the exact command per missing item and a list of what only the human can do; hints `branch-protection` and `agent-merge-deny` (Claude Code `Bash(gh pr merge:*)`).
+
+### Changed
+- `sync-agents --global` writes a short bootstrap block (also for Codex) instead of the full standard; an old full block is replaced on the next run, text outside the block is kept. The full standard lives in each project's `AGENTS.md`. The `duplicate-standards` hint only fires for the full global block.
+- Notes: `gh` is never needed by tests or CI; commands that use it degrade to printed instructions. Not verified against a real GitHub (no `gh` on the release machine): `protect-branch --apply`, `pr` with `gh`.
+
 ## [1.7.0] - 2026-10-24
 
 ### Added
