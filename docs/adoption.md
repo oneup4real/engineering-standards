@@ -58,6 +58,8 @@ This writes a short bootstrap block (not the full standard) into `~/.agents/AGEN
 
 ## GitHub settings per repository
 
+Two levels of protection: the **local guard** (the pre-push hook refuses direct pushes to the default branch; default, works on private repos on the free plan; a human can override once with `ONEUP_ALLOW_DEFAULT_PUSH=1`; it does not stop someone who edits hooks or uses `--no-verify`) and **GitHub branch protection** via `protect-branch` (binding for everyone; needs a public repo or a Pro/Team plan; recommended once more than one person works in the repo or the default branch deploys to production). With several people, a Pro account or organisation plan plus `protect-branch` is the better choice. Claude Code tip: deny `Bash(gh pr merge:*)` and `Bash(git push origin main:*)` in `.claude/settings.json`.
+
 - Ruleset on the default branch: restrict deletions, block force pushes, require a pull request, and require status
   checks `ci / ci`, `security / gitleaks`, `security / audit`, and `security / semgrep` or `security / codeql`.
 - Quick setup of the first bullet (classic branch protection; `init` can create the ruleset instead): `npx oneup-standards protect-branch` (dry run), then `--apply`. Agents push feature branches and open pull requests; only a human merges.

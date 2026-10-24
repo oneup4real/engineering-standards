@@ -107,7 +107,7 @@ flowchart TD
 
 **What the human does at G6:** open the PR; check the tier line, green checks and the reviewer verdicts (open `UNCHECKED` items are decided by you); at T3 read the security reviewer's OWASP lines and the abuse-case tests, then leave the approval as a PR review or comment; merge on GitHub; deploy Firestore/Storage rules and indexes yourself (agents never do); run `finish --apply`.
 
-**Pull request flow.** Agents push a feature branch and `npx oneup-standards pr` opens the pull request (body: your template, the computed risk tier, reviewers and commits; without `gh` it prints the compare link and the text to paste). `pr` never merges. `protect-branch` enforces this on GitHub (a direct push to `main` is rejected). To stop Claude Code from merging, add `Bash(gh pr merge:*)` to `permissions.deny` in `.claude/settings.json` (`doctor` hints when it is missing). After the merge, `finish` (dry run) and `finish --apply` fetch, fast-forward the default branch and delete the local branch only when it is proven done (merged by ancestry, a merged pull request via `gh`, or every commit already on the default branch by patch-id). `--remote` also deletes `origin/<branch>`; `--worktrees` removes finished worktrees without uncommitted changes. Tip: enable GitHub Settings > General > "Automatically delete head branches". A squash or rebase merge creates new commits, so `git branch -d` refuses; `finish` checks the pull request or patch-ids first and only then uses `-D`.
+**Pull request flow.** Agents push a feature branch and `npx oneup-standards pr` opens the pull request (body: your template, the computed risk tier, reviewers and commits; without `gh` it prints the compare link and the text to paste). `pr` never merges. The pre-push hook refuses direct pushes to the default branch locally, and `protect-branch` enforces it on GitHub where the plan allows it ([two levels of protection](#two-levels-of-protection)). To stop Claude Code from merging, add `Bash(gh pr merge:*)` to `permissions.deny` in `.claude/settings.json` (`doctor` hints when it is missing). After the merge, `finish` (dry run) and `finish --apply` fetch, fast-forward the default branch and delete the local branch only when it is proven done (merged by ancestry, a merged pull request via `gh`, or every commit already on the default branch by patch-id). `--remote` also deletes `origin/<branch>`; `--worktrees` removes finished worktrees without uncommitted changes. Tip: enable GitHub Settings > General > "Automatically delete head branches". A squash or rebase merge creates new commits, so `git branch -d` refuses; `finish` checks the pull request or patch-ids first and only then uses `-D`.
 
 **Project = full standard, global = bootstrap.** The full standard lives in each project's `AGENTS.md`. `sync-agents --global` writes only a short bootstrap block into `~/.agents/AGENTS.md`; your personal rules go outside the block. This avoids reading the same ~160 lines twice per request.
 
@@ -394,7 +394,7 @@ flowchart LR
 | **Workstation Linting** | **ESLint** | Workstation (pre-commit) & CI | Catches forbidden AST syntax patterns (direct client DB writes, secrets in `NEXT_PUBLIC_*`, `any` type casts). | Sub-second AST parsing blocks dangerous patterns before code is ever committed to local history. |
 | **Deep Code Analysis (SAST)** | **Semgrep** (registry packs + our rules) / **CodeQL** | CI (`security.yml`); our rules also on staged files locally | Semantic taint-tracking, SSRF, injection vulnerabilities, prototype pollution across file boundaries. | Comprehensive vulnerability rule suites require containerized runtimes and multi-file AST indexing, which would unacceptably slow down local git commit workflows. Locally only our small rule file runs, on staged files. |
 
-> **Direct push to `main`?** Local hooks can be bypassed with `--no-verify`, so the real guard is on GitHub: a branch ruleset or `protect-branch` blocks direct pushes and requires a pull request with green checks ([section 9](#9-make-the-checks-mandatory-on-github)). As a second net, a project's `ci.yml` normally also triggers on `push` to `main`, so SAST and secret scans still run and alert.
+> **Direct push to `main`?** The pre-push hook refuses it locally (works on private repos on the free plan). Local hooks can be bypassed with `--no-verify`, so the binding guard is on GitHub, where the plan allows it: a branch ruleset or `protect-branch` blocks direct pushes and requires a pull request with green checks ([section 9](#9-make-the-checks-mandatory-on-github)). As a second net, a project's `ci.yml` normally also triggers on `push` to `main`, so SAST and secret scans still run and alert.
 
 ---
 
@@ -687,6 +687,19 @@ flowchart TD
 
 Local hooks catch mistakes on your machine, but GitHub branch protection prevents anyone (human or agent) from bypassing them with `--no-verify`. It is also what enforces the [pull request flow](#1-the-delivery-flow-who-does-what-when): nobody pushes to `main`, only a human merges.
 
+### Two levels of protection
+
+| | Local guard (default) | GitHub branch protection |
+|---|---|---|
+| How | `hook pre-push` refuses a push to the default branch (`hooks.protectDefaultBranch`, default `true`; `hooks.defaultBranch` overrides `origin/HEAD`) | `npx oneup-standards protect-branch` |
+| Works on | everywhere, including private repositories on the free plan | public repositories, or a GitHub Pro / Team plan (the API answers 403 "Upgrade to GitHub Pro or make this repository public" otherwise) |
+| Stops | accidental direct pushes by agents and people; feature branches, tags and branch deletes still work | everyone, technically binding on the server |
+| Does not stop | someone who edits the hooks or uses `--no-verify` | nothing it covers |
+| Override | a human, once: `ONEUP_ALLOW_DEFAULT_PUSH=1 git push ...` (agents never set it) | admins only, if you did not use `--include-admins` |
+| Use | always | **recommended** as soon as more than one person works in the repo, or when the default branch deploys to production |
+
+With several people, a Pro account (or an organisation plan) plus `protect-branch` is the better choice. `doctor` shows both lines (`Local default-branch guard`, `Branch protection`); on the free plan the second reads `n/a`. Claude Code tip: add `Bash(gh pr merge:*)` and `Bash(git push origin main:*)` to `permissions.deny` in `.claude/settings.json`.
+
 ### 1. Branch Ruleset (Repository Settings → Rules → Rulesets)
 Create a ruleset targeting the default branch:
 - ✅ **Restrict deletions**
@@ -703,7 +716,7 @@ Create a ruleset targeting the default branch:
 
 > **Why this is non-negotiable:** local hooks can be bypassed with `--no-verify` and SAST runs only in CI. A ruleset guarantees that **all** code passes SAST, secret audits and architecture checks before it can be merged.
 
-With `gh` installed, `init` (step 8/8) can create this ruleset for you. Quicker alternative, classic branch protection: `npx oneup-standards protect-branch` prints the exact API payload and the click path (dry run). Add `--apply` to send it through `gh`. Flags: `--branch main`, `--checks "ci / ci,security / audit"` (default: the check runs of the latest commit, if `gh` is available), `--approvals 0` (a human merges; raise it for a second reviewer), `--include-admins` (admins cannot bypass either). It needs admin rights, and private repositories need a paid GitHub plan. `doctor` hints when the default branch is unprotected (never in CI).
+With `gh` installed, `init` (step 8/8) can create this ruleset for you. Quicker alternative, classic branch protection: `npx oneup-standards protect-branch` prints the exact API payload and the click path (dry run). Add `--apply` to send it through `gh`. Flags: `--branch main`, `--checks "ci / ci,security / audit"` (default: the check runs of the latest commit, if `gh` is available), `--approvals 0` (a human merges; raise it for a second reviewer), `--include-admins` (admins cannot bypass either). It needs admin rights, and private repositories need a paid GitHub plan. `doctor` hints when the default branch is unprotected (never in CI). On a private repository on the free plan GitHub answers 403; `protect-branch --apply` then exits 2 with a clear message and the local guard stays your protection.
 
 ---
 
@@ -712,7 +725,7 @@ With `gh` installed, `init` (step 8/8) can create this ruleset for you. Quicker 
 | Event | Execution Target | Checks Executed | Fail Conditions |
 |---|---|---|---|
 | `git commit` | Local Machine (`.husky/pre-commit`) | `check-files`, `gitleaks protect`, `lint-staged`, SAST on staged files (`semgrep` installed; report-only unless `hooks.sastBlocking`) | Staged keys/env files, exposed credentials, lint errors. |
-| `git push` | Local Machine (`.husky/pre-push`) | `tsc --noEmit`, `npm test` once, `npm audit` only when `package-lock.json` changed and the network is up (report-only unless `hooks.auditBlocking`; level `hooks.auditLevel`, default `high`) | TypeScript type errors, failing unit tests. |
+| `git push` | Local Machine (`.husky/pre-push`) | `tsc --noEmit`, `npm test` once, `npm audit` only when `package-lock.json` changed and the network is up (report-only unless `hooks.auditBlocking`; level `hooks.auditLevel`, default `high`); first refuses a push to the default branch (`hooks.protectDefaultBranch`; human override `ONEUP_ALLOW_DEFAULT_PUSH=1`) | TypeScript type errors, failing unit tests. |
 | **Pull Request (CI Pipeline)** | GitHub Actions (`ci-node.yml`) | • Standards doctor drift scan<br>• Forbidden file audit<br>• ESLint (`--max-warnings=0`)<br>• TypeScript compile<br>• Vitest with coverage<br>• `check-tests-changed` (TDD)<br>• `check-diff-coverage` (≥80%)<br>• dependency-cruiser layers<br>• `arch/suite.js` (action guards & write ratchets)<br>• Production build<br>• `check-bundle` confidential scanner | Any warning or error, missing tests on source edits, diff coverage < 80%, layer violations, unguarded server actions, confidential bundle leaks. |
 | **Pull Request (Security)** | GitHub Actions (`security.yml`) | • Pinned Gitleaks full history audit<br>• `npm audit`<br>• Semgrep SAST / CodeQL<br>• Dependency review | Leaked secrets anywhere in git history, high/critical CVEs, insecure AST patterns. |
 | **Weekly** | Dependabot | Weekly check for new `@oneup4real/standards` releases | Outdated central standards package. |
@@ -757,7 +770,7 @@ All commands run as `npx oneup-standards <command>` (`--help` lists them). Daily
 | `check-bundle` | `[--dir <path>]` | Scans production JavaScript bundles for confidential markers configured in `.standardsrc.json`. |
 | `check-tests-changed` | `--base <git-ref>` or explicit paths | Enforces TDD by failing if source code changed without corresponding test modifications. |
 | `check-diff-coverage` | `--base <ref> \| --diff-file <f>` `[--min 80] [--lcov coverage/lcov.info] [--if-present]` | Fails if newly added or modified lines have less than the required test coverage percentage. |
-| `hook` | `pre-commit \| pre-push` | Runs the git hook sequences installed by Husky. Options in `.standardsrc.json`: `hooks.sastBlocking`, `hooks.auditBlocking`, `hooks.auditLevel`. |
+| `hook` | `pre-commit \| pre-push` | Runs the git hook sequences installed by Husky. Options in `.standardsrc.json`: `hooks.sastBlocking`, `hooks.auditBlocking`, `hooks.auditLevel`, `hooks.protectDefaultBranch` (default `true`), `hooks.defaultBranch`. `pre-push` reads the pushed refs from stdin first and refuses the default branch. |
 | `risk-tier` | `[--base <ref>] [--json] [paths...]` | Classifies the diff into T0-T3 by changed paths (default base `origin/main`; globs configurable under `riskTiers` in `.standardsrc.json`), prints tier, reviewers and whether a human approval is required. Exit 0 (2 on usage errors). |
 | `add` | `<mutation\|dast\|all> [--force] [--dry-run]` | Opt-in templates, never installed by default: Stryker config + changed-files CI job, nightly OWASP ZAP baseline. Same via `init --with mutation,dast`. Report only until a repository variable switches blocking on (see [docs/adoption.md](docs/adoption.md)). SAST and SCA are not templates: they are part of the shared `security.yml`. |
 

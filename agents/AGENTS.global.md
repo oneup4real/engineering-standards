@@ -80,7 +80,7 @@ Classify every task at the start and state the tier in the plan. The highest mat
 - Tools before agents: lint, types, tests, coverage, depcruise, SAST, secret scan, bundle check decide first; an LLM reviewer never repeats what a tool proves.
 - `npx oneup-standards risk-tier --base origin/main` classifies the diff and names the reviewers; use it at G0 and again before review.
 - Review triggers by path (`risk-tier` names them; T3: security, logic, test-quality always, ui and architecture only when UI or layer paths changed; T2: logic; T1: ui; T0: none). Verdicts are `approve`, `changes-requested` or `escalate`; findings are `blocker`, `major` or `minor`. Every T3 security review answers OWASP Web Top 10 and API Security Top 10 with one line per applicable item.
-- Agents never push to the default branch and never merge. They push a feature branch and open a pull request; a human merges. T3 requires human approval in the PR. Direct pushes to main deploy to production in many projects.
+- Agents never push to the default branch and never merge. They push a feature branch and open a pull request; a human merges. T3 requires human approval in the PR. Direct pushes to main deploy to production in many projects. The pre-push hook blocks them locally; agents never set `ONEUP_ALLOW_DEFAULT_PUSH` and never use `--no-verify`.
 - `npm run test:unit` must run the same test project as CI. Numbers and counts claimed in docs must be verified by script where possible.
 
 ## 2. Architecture
