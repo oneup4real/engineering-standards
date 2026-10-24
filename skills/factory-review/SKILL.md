@@ -31,8 +31,8 @@ State the tier in the plan. T3 always needs a human approval before merge/releas
 
 | Reviewer | Trigger paths | File |
 |---|---|---|
-| security | auth, actions, rules, payments, public routes, uploads | `references/security-review.md` |
+| security | auth, actions, `src/server`, rules, payments/money, public routes, uploads; always at T3 | `references/security-review.md` |
 | ui | `src/components`, styles | `references/ui-review.md` (uses `ui-consistency`) |
-| logic | `src/server/services`, `src/domain`, state machines | `references/logic-review.md` |
-| architecture | new folders, imports, actions | `references/arch-review.md` |
-| test-quality | tests of guards and money/state logic | `references/test-quality.md` |
+| logic | `src/lib`, `src/domain`, `src/shared`, services, state machines | `references/logic-review.md` |
+| architecture | new folders, cross-layer imports, actions, `src/server`, `src/domain` (never T0) | `references/arch-review.md` |
+| test-quality | tests of guards and money/state logic; always at T3 | `references/test-quality.md` |

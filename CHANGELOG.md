@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.2] - 2026-10-24
+
+### Changed (docs only, no behaviour change)
+- README audited and restructured (1101 to about 950 lines): "Start here" block; one gate table (G0-G6) with orchestrator duty, human duty, model role, tool and required evidence; one tier table (examples, spec, builder, reviewers, approver); duplicate pipeline and review diagrams and the SSDLC mega-diagram removed; sections renumbered 1-14 with a verified TOC; new section 2 defines per reviewer the trigger paths, model role, inputs, rules, finding vs pass (blocker/major/minor), verdict, output and escalation, plus a compact OWASP Web/API table; new section 3 with onboarding for new and existing projects and a "which command when" table.
+- Corrected: T3 runs all five reviewers (as `risk-tier` does), not "by path"; T2 approver is the only agent approver; Part 2 diagram shows the tier decision at G6; Sonnet product names replaced by model roles; "four layers" of skill protection are five; stale section references in `docs/adoption.md`; the `risk-tier` output name `arch` for the architecture reviewer is documented.
+- `AGENTS.global.md` section 1b, `factory-review` SKILL.md and the reviewer brief now use the same wording (model roles per step, reviewer triggers, finding severities and verdicts).
+
 ## [1.7.1] - 2026-10-24
 
 ### Added

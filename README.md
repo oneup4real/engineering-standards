@@ -2,69 +2,57 @@
 
 **Machine-Enforced Secure SDLC, Architecture Guardrails, and AI-Agent Governance.**
 
-One source of truth for the rules every project must follow. Projects connect once via an interactive setup wizard (`npx oneup-standards init`). From then on, automated checks run before every commit and on every pull request. Central improvements automatically reach every project through standard updates, while anti-drift tooling ensures configurations remain synchronized.
+One source of truth for the rules every project must follow. Projects connect once via an interactive setup wizard (`npx oneup-standards init`). From then on, automated checks run before every commit and on every pull request. Central improvements reach every project through standard updates, and anti-drift tooling keeps configurations synchronized.
 
-### 🎯 Primary Harness & Universal Compatibility
+> **Start here.**
+> - **What:** a package (`@oneup4real/standards`) with shared lint/type/architecture/test configs, git hooks, CI workflows, AI-agent rules and skills. Rules are enforced by machines (hooks, CI, AST checks), not by polite requests in a prompt.
+> - **Flow in one paragraph:** classify the task into a risk tier (T0 docs to T3 security/money). An agent writes a spec (T2/T3), a plan and the code test-first on a **feature branch**. CI runs all tool gates once. Only reviewers triggered by the changed paths (security, ui, logic, architecture, test-quality) read that evidence and attack what tools cannot check; at most 2 fix rounds, then a human decides. A human merges the pull request; at T3 only after a recorded approval.
+> - **Daily commands:** `npx oneup-standards doctor` (is the project healthy?) · `risk-tier` (tier and reviewers of the current diff) · `pr` (open the pull request) · `finish` (clean up after the merge) · `add` (opt-in SAST/SCA/mutation/DAST).
+> - **First time:** `npx oneup-standards init` ([new or existing project](#3-adopt-it-new-and-existing-projects)). Full flow: [section 1](#1-the-delivery-flow-who-does-what-when). Who checks what: [section 2](#2-what-each-reviewer-checks).
 
-- **Built Primarily For:** **Google Antigravity IDE** and **Claude Code CLI within Antigravity**. Antigravity is a premier harness for autonomous agentic engineering; running Claude models inside Antigravity introduces unique host-sandbox boundaries and plugin isolation constraints. This framework was built from the ground up to automate cross-harness skill synchronization (`~/.gemini/config/skills`), manage subagent dual-control protocols, and enforce zero-forget pre-flight checks in Antigravity sessions.
-- **Works Seamlessly Across Other Setups:** While optimized for Antigravity, `@oneup4real/standards` is **100% harness-agnostic at its core**. It runs equally well in:
-  - **Standalone Claude Code CLI** (Terminal / zsh / bash)
-  - **Cursor, VS Code, & Windsurf** (via standard Git hooks, flat ESLint, TypeScript, and `AGENTS.md`)
-  - **GitHub Codespaces & Cloud Dev Environments**
-  - **Headless CI/CD Pipelines** (GitHub Actions, GitLab CI)
-
-Because guardrails are enforced by deterministic machine gates (Husky pre-commit, Gitleaks, AST parsers, Vitest, and ESLint) rather than IDE-specific plugins, your security baseline holds true regardless of whether your team codes in Antigravity, Cursor, or raw terminal sessions.
-
-> **The Core Problem in Agentic Coding:** Writing rules into a project's `AGENTS.md` or system prompt is insufficient. AI coding agents (and humans under pressure) read guidelines, hallucinate compliance, take shortcuts, and commit untested or insecure code.
->
-> In this repository, **rules are enforced by machines, not polite requests**. If an agent or developer violates architectural boundaries, skips tests, leaves confidential markers in bundles, or omits authorization guards, the commit or the pull request fails deterministically.
+Works in Google Antigravity IDE, Claude Code CLI (standalone or inside Antigravity), Cursor, VS Code, Windsurf, Codespaces and headless CI. Guardrails are deterministic machine gates (Husky, Gitleaks, AST parsers, Vitest, ESLint), not IDE plugins, so the baseline holds in every harness. Cross-harness skill sync: [section 7](#7-cross-harness-ai-skill-governance).
 
 ---
 
 ## Table of Contents
 
-0. [The delivery flow: who does what, when](#the-delivery-flow-who-does-what-when)
-1. [Secure SDLC (SSDLC) Phase Mapping](#1-secure-sdlc-ssdlc-phase-mapping)
-2. [SSDLC Pipeline & Architecture Flow](#2-ssdlc-pipeline--architecture-flow)
-3. [Tools Used & Risk Mitigation Matrix](#3-tools-used--risk-mitigation-matrix)
-    - [Defense-in-Depth: SAST vs. Linting vs. Testing](#defense-in-depth-sast-vs-linting-vs-testing)
-4. [Architectural Guardrails & Threat Boundaries](#4-architectural-guardrails--threat-boundaries)
-    - [UI Consistency Guardrails](#ui-consistency-guardrails)
-5. [Specialist Review Protocol (Dual Control)](#5-specialist-review-protocol-dual-control)
-6. [Cross-Harness AI Skill Governance (Antigravity & Claude Code)](#6-cross-harness-ai-skill-governance-antigravity--claude-code)
-7. [Quickstart: New Projects](#7-quickstart-new-projects)
-8. [Quickstart: Existing Projects](#8-quickstart-existing-projects)
-9. [Fleet Anti-Drift: Doctor & Upgrade](#9-fleet-anti-drift-doctor--upgrade)
-    - [Smart Non-Destructive Merging (`--merge`)](#smart-non-destructive-merging-merge)
-10. [Make the Checks Mandatory on GitHub](#10-make-the-checks-mandatory-on-github)
-11. [What Happens When (Pipeline Breakdown)](#11-what-happens-when-pipeline-breakdown)
-12. [A Check Failed. What Now?](#12-a-check-failed-what-now)
-13. [CLI Commands Reference](#13-cli-commands-reference)
-14. [Importable Building Blocks](#14-importable-building-blocks)
-15. [Appendices (Deep Technical Details)](#15-appendices-deep-technical-details)
-    - [Appendix A: The Three Delivery Channels](#appendix-a-the-three-delivery-channels)
-    - [Appendix B: Cryptographic Anti-Drift Fingerprinting](#appendix-b-cryptographic-anti-drift-fingerprinting)
-    - [Appendix C: Monotonic Ratchets for Legacy Migration](#appendix-c-monotonic-ratchets-for-legacy-migration)
-    - [Appendix D: TypeScript AST Guard Inspection](#appendix-d-typescript-ast-guard-inspection)
-    - [Appendix E: Supply Chain Security & Action Pinning](#appendix-e-supply-chain-security--action-pinning)
-
+1. [The delivery flow: who does what, when](#1-the-delivery-flow-who-does-what-when)
+2. [What each reviewer checks](#2-what-each-reviewer-checks)
+3. [Adopt it: new and existing projects](#3-adopt-it-new-and-existing-projects)
+4. [Secure SDLC (SSDLC) phase mapping](#4-secure-sdlc-ssdlc-phase-mapping)
+5. [Tools and risk mitigation matrix](#5-tools-and-risk-mitigation-matrix)
+6. [Architectural guardrails and threat boundaries](#6-architectural-guardrails-and-threat-boundaries) (incl. [UI Consistency Guardrails](#ui-consistency-guardrails))
+7. [Cross-harness AI skill governance](#7-cross-harness-ai-skill-governance)
+8. [Fleet anti-drift: doctor and upgrade](#8-fleet-anti-drift-doctor-and-upgrade)
+9. [Make the checks mandatory on GitHub](#9-make-the-checks-mandatory-on-github)
+10. [What happens when](#10-what-happens-when)
+11. [A check failed. What now?](#11-a-check-failed-what-now)
+12. [CLI commands reference](#12-cli-commands-reference)
+13. [Importable building blocks](#13-importable-building-blocks)
+14. [Appendices](#14-appendices)
 
 ---
 
-## The delivery flow: who does what, when
+## 1. The delivery flow: who does what, when
 
-One rule drives everything: **cheap deterministic tools first, LLM reviewers only where triggered, the
-smallest sufficient model per role, gates run once in CI.** Agents read the CI evidence; they do not re-run it.
+One rule drives everything: **cheap deterministic tools first, LLM reviewers only where triggered, the smallest sufficient model per role, gates run once in CI.** Agents read the CI evidence; they do not re-run it.
 
-Why: in a 70-agent project the value came from reviewers with a specific attack brief (stored XSS, a short code
-used as credential, bypass via the edit action, inconsistent paid/approved state), from mutation checks of tests
-(surviving mutants exposed unguarded paths) and from real-browser fuzzing. The waste came from the strongest model
-doing mechanical work, the same gates re-run by implementer, reviewer and controller, per-task reviews of
-mechanical UI work, unbounded fix loops, and recurring findings (test gaps, wrong numbers in docs) that a tool finds.
+Why: in a 70-agent project the value came from reviewers with a specific attack brief (stored XSS, a short code used as credential, bypass via the edit action, inconsistent paid/approved state), from mutation checks of tests and from real-browser fuzzing. The waste came from the strongest model doing mechanical work, the same gates re-run by implementer, reviewer and controller, per-task reviews of mechanical UI work, unbounded fix loops, and recurring findings that a tool can find.
 
-Legend: amber = human, blue = agent, green = tool/CI, red outline = gate or decision; the node text names the actor. Swimlane view: see the RACI table. Model roles: `strong`, `mid`, `small` (never product names).
+**Vocabulary (used the same way everywhere).**
 
-### (a) Big picture: gates G0 to G6 in two parts
+| Term | Meaning |
+|---|---|
+| Tier `T0`-`T3` | Risk class of a change: T0 docs/mechanical, T1 UI, T2 logic, T3 security/money/roles/public endpoint/data migration. Highest matching tier wins. |
+| Gate `G0`-`G6` | Step of the flow: G0 classify, G1 spec, G2 plan, G3 build, G4 tool gates, G5 specialist review, G6 release (pull request, approval, merge). |
+| Model role | `strong`, `mid`, `small`: capability classes, never product names. `strong`: T3 spec, architecture decisions, T3 security review, T2 approver. `mid`: orchestrator, T2 spec and plan, T2/T3 builder, standard reviewers. `small`: T0/T1 builder, mechanical edits, collecting tool output. Raise a role one step only after a failed fix round. |
+| Orchestrator | The main agent session that classifies, plans, dispatches builders and reviewers and reads the evidence. It never approves its own code. |
+| Reviewer | Fresh-context specialist: `security`, `ui`, `logic`, `architecture`, `test-quality`. Section [2](#2-what-each-reviewer-checks). |
+| Pull request flow | Agents push a feature branch and open a pull request (`pr`); only a human merges; `finish` cleans up. Nobody pushes to the default branch. |
+
+Diagram legend: amber = human, blue = agent, green = tool/CI, red outline = gate or decision.
+
+### Gates G0 to G6
 
 **Part 1: Specify and plan (G0-G2)**
 
@@ -82,8 +70,6 @@ flowchart LR
     E --> F["to Part 2"]:::agent
 ```
 
-Once the plan exists, the work moves to Part 2.
-
 **Part 2: Build, verify, release (G3-G6)**
 
 ```mermaid
@@ -96,21 +82,36 @@ flowchart TD
     B --> C{"Green?"}:::gate
     C -->|Yes| D["G5 Agent:<br/>review"]:::agent
     C -.->|"No: fix"| A
-    D --> E{"Passed?"}:::gate
+    D --> E{"Approved?"}:::gate
     E -.->|"No: fix, max 2,<br/>then human"| A
-    E -->|Yes| F{"T3?"}:::gate
-    F -->|Yes| G["G6 Human:<br/>approves PR"]:::human
-    F -->|No| H["G6 Human:<br/>merges PR"]:::human
-    G --> H
+    E -->|Yes| F{"Tier?"}:::gate
+    F -->|"T0, T1"| H["G6 Human:<br/>merges PR"]:::human
+    F -->|T2| G2["G6 Agent:<br/>approver, strong"]:::agent
+    F -->|T3| G3["G6 Human:<br/>approves PR"]:::human
+    G2 --> H
+    G3 --> H
 ```
 
-At G6 agents push a feature branch and `npx oneup-standards pr` opens the pull request (body: your template, the computed risk tier, reviewers and commits; without `gh` it prints the compare link and the text to paste). Only a human merges (T3: with a recorded approval); `pr` never merges. `npx oneup-standards protect-branch` enforces this on GitHub, so a direct push to `main` is rejected. To stop Claude Code from merging, add `Bash(gh pr merge:*)` to `permissions.deny` in `.claude/settings.json` (`doctor` hints when it is missing).
+| Gate | Orchestrator does | Human does | Model role | Tool | Evidence required to pass |
+|---|---|---|---|---|---|
+| G0 Classify | Runs `risk-tier`, writes the tier into the plan; unsure means the higher tier | States the request; confirms every T3 | `mid` | `risk-tier` | Tier line in the plan |
+| G1 Spec | T0 none; T1 3-line brief; T2 spec with tests listed; T3 spec with [abuse cases](skills/factory-review/references/abuse-cases-template.md), each row names a test | **Approves the spec at T2/T3** (checklist below) | `small` T1, `mid` T2, `strong` T3 | abuse-case template | Approved spec; T3: every abuse case maps to a test name |
+| G2 Plan | Numbered tasks with acceptance criteria, file targets, tests, UI reuse table; saves it in `docs/plans/` | OK for non-trivial work | `mid` | none | Plan file with tier and reuse table (T1-T3) |
+| G3 Build | One implementer per task: failing test first, minimal code, fast local checks only (typecheck, changed tests) | none | `small` T0/T1, `mid` T2/T3 | local typecheck and tests | Red-then-green test, diff on a feature branch |
+| G4 Tool gates | Reads the CI result, never re-runs it; red CI goes back to G3 (not a fix round) | none | none | lint, types, tests, diff coverage, depcruise, arch suite, build, bundle, SAST, gitleaks, audit; mutation at T3 (opt-in) | Green CI run (link or output) |
+| G5 Review | Runs `risk-tier`, dispatches the triggered reviewers with the [brief](skills/factory-review/references/reviewer-brief-template.md), collects verdicts, runs the fix loop | none (only after round 2) | reviewers by role, section 2 | CI output as input | `approve` from every triggered reviewer; T3: one OWASP line per item |
+| G6 Release | Pushes the feature branch and runs `pr`; at T2 the approver agent confirms CI green and all verdicts `approve` | Reviews the PR; **T3: records the approval**; merges; deploys rules and indexes; then `finish` | `strong` approver at T2; none at T0/T1 | branch protection | PR link, green checks, T3: human approval in the PR |
+| Feedback | Proposes a tool check for each recurring finding | Triages | `mid` | `doctor`, ratchets | Fewer findings of the same kind |
 
-After you merged on GitHub, run `npx oneup-standards finish` (dry run) and `--apply`: it fetches, fast-forwards the default branch and deletes the local branch only when it is proven done (merged by ancestry, a merged pull request via `gh`, or every commit already on the default branch by patch-id). `--remote` also deletes `origin/<branch>`; `--worktrees` removes finished worktrees without uncommitted changes. Tip: enable GitHub Settings > General > "Automatically delete head branches". Pitfall: a squash or rebase merge creates new commits, so git calls the original branch "not merged" and `git branch -d` refuses; `finish` checks the pull request or patch-ids first and only then uses `-D`.
+**What the human does at G1** (before any code): the scope matches the request; every abuse case is something an attacker could really do and none is missing for the assets involved (money, roles, public links, uploads); each abuse case names a test; the tier is right; open questions are answered.
 
-**Project = full standard, global = bootstrap.** The full standard lives in each project's `AGENTS.md` and travels with the repo. `sync-agents --global` writes only a short bootstrap block into `~/.agents/AGENTS.md` (what the block is, run `init` when a project lacks the standard, `sync-skills` for skills); your personal rules go outside the block. This avoids reading the same ~160 lines twice per request.
+**What the human does at G6:** open the PR; check the tier line, green checks and the reviewer verdicts (open `UNCHECKED` items are decided by you); at T3 read the security reviewer's OWASP lines and the abuse-case tests, then leave the approval as a PR review or comment; merge on GitHub; deploy Firestore/Storage rules and indexes yourself (agents never do); run `finish --apply`.
 
-### (b) Risk tier: which questions, in which order
+**Pull request flow.** Agents push a feature branch and `npx oneup-standards pr` opens the pull request (body: your template, the computed risk tier, reviewers and commits; without `gh` it prints the compare link and the text to paste). `pr` never merges. `protect-branch` enforces this on GitHub (a direct push to `main` is rejected). To stop Claude Code from merging, add `Bash(gh pr merge:*)` to `permissions.deny` in `.claude/settings.json` (`doctor` hints when it is missing). After the merge, `finish` (dry run) and `finish --apply` fetch, fast-forward the default branch and delete the local branch only when it is proven done (merged by ancestry, a merged pull request via `gh`, or every commit already on the default branch by patch-id). `--remote` also deletes `origin/<branch>`; `--worktrees` removes finished worktrees without uncommitted changes. Tip: enable GitHub Settings > General > "Automatically delete head branches". A squash or rebase merge creates new commits, so `git branch -d` refuses; `finish` checks the pull request or patch-ids first and only then uses `-D`.
+
+**Project = full standard, global = bootstrap.** The full standard lives in each project's `AGENTS.md`. `sync-agents --global` writes only a short bootstrap block into `~/.agents/AGENTS.md`; your personal rules go outside the block. This avoids reading the same ~160 lines twice per request.
+
+### Risk tiers
 
 ```mermaid
 flowchart LR
@@ -126,63 +127,27 @@ flowchart LR
     Q3 -->|No| T0["T0 docs, mechanical"]:::agent
 ```
 
-Highest matching tier wins; when unsure take the higher one. Examples: `skills/factory-review/references/tiers.md`.
+Highest matching tier wins; when unsure take the higher one; a tier may go up during the work, never down. Split mixed changes; the UI part of a T3 change still follows T3 in the shared PR.
 
-### (c) Pipeline per tier
+| | T0 docs/mechanical | T1 UI | T2 logic | T3 security/money/roles |
+|---|---|---|---|---|
+| Examples | typo, README, lint autofix, rename | new button variant, spacing fix, screen moved to primitives | new status transition, fee calculation, new staff server action | role change, payment-reported flow, public booking link, Firestore rule, data backfill, upload, email template |
+| Spec (G1) | none | 3-line brief | spec with tests listed | spec with abuse cases, each a test |
+| Builder (G3) | `small` | `small` | `mid` | `mid` |
+| Tool gates (G4) | required | required | required | required, plus mutation and SAST |
+| Reviewers (G5) | none | ui, once per batch | logic, plus architecture and test-quality when triggered | **all five**; security is `strong` and answers the OWASP table |
+| Fix rounds | n/a | max 2 | max 2 | max 2, then human |
+| Approver (G6) | CI green, human merges | CI green, human merges | agent approver (`strong`), human merges | **human approval, always**, then human merges |
 
-```mermaid
-flowchart TD
-    classDef human fill:#ffd37a,stroke:#9a6b00,color:#000
-    classDef agent fill:#a9cdf5,stroke:#1f5fa8,color:#000
-    classDef tool fill:#a8e0b0,stroke:#23753a,color:#000
-    classDef gate fill:#fff,stroke:#d32f2f,stroke-width:3px,color:#000
-    TIER{"Tier?"}:::gate
-    A0["small builds"]:::agent
-    A1["small builds, short brief"]:::agent
-    A2["mid builds, spec and tests"]:::agent
-    A3["strong spec with abuse cases, mid builds"]:::agent
-    CI["Tool gates in CI, once"]:::tool
-    B1["ui review, once per batch"]:::agent
-    B2["logic review, plus arch and test-quality if triggered"]:::agent
-    B3["all specialists, strong security review"]:::agent
-    C2["approver agent, strong"]:::agent
-    C3["HUMAN approval, always"]:::human
-    M["Merge"]:::tool
-    TIER -->|T0| A0 --> CI
-    TIER -->|T1| A1 --> CI
-    TIER -->|T2| A2 --> CI
-    TIER -->|T3| A3 --> CI
-    CI -->|T0| M
-    CI -->|T1| B1 --> M
-    CI -->|T2| B2 --> C2 --> M
-    CI -->|T3| B3 --> C3 --> M
+**T3 means** a mistake costs money, leaks data, grants access or cannot be undone. Never merged on agent approval alone, whatever the reviewers say.
+
+**G0 by tool: `npx oneup-standards risk-tier [--base <ref>] [--json] [paths...]`** classifies the diff by changed paths (the highest tier of any file wins; exit code 0, 2 on usage errors) and prints the tier, the reviewers to run and whether a human approval is required. Defaults: T3 = `src/app/actions/**`, `src/server/**`, `*.rules`, `**/auth*`, email templates, and paths containing money/payment/fee/role/token-style keywords; T2 = `src/lib/**`, `src/domain/**`, `src/shared/**`, hooks, context and unknown source paths; T1 = `src/components/**`, styles; T0 = docs, tests, config. The tool prints `arch` for the architecture reviewer. Replace the globs of a tier per project in `.standardsrc.json`:
+
+```json
+{ "riskTiers": { "T3": ["src/server/**", "billing/**"], "keywords": ["payment", "role"] } }
 ```
 
-### (d) Review fan-out by changed paths
-
-```mermaid
-flowchart LR
-    classDef human fill:#ffd37a,stroke:#9a6b00,color:#000
-    classDef agent fill:#a9cdf5,stroke:#1f5fa8,color:#000
-    classDef tool fill:#a8e0b0,stroke:#23753a,color:#000
-    classDef gate fill:#fff,stroke:#d32f2f,stroke-width:3px,color:#000
-    CI["CI output: read, do not re-run"]:::tool --> P{"Which paths changed?"}:::gate
-    P -->|"auth, actions, rules, money"| SEC["security, strong at T3"]:::agent
-    P -->|"components, styles"| UI["ui, mid"]:::agent
-    P -->|"services, domain"| LOG["logic, mid"]:::agent
-    P -->|"new folders, imports"| ARC["architecture, mid"]:::agent
-    P -->|"guard or money tests"| TQ["test-quality, mid"]:::agent
-    SEC --> F{"Blockers?"}:::gate
-    UI --> F
-    LOG --> F
-    ARC --> F
-    TQ --> F
-    F -->|No| OK["Approver"]:::agent
-    F -->|Yes| FIX["Builder fixes, max 2 rounds"]:::agent
-    FIX -.->|"escalate after round 2"| HU["Human"]:::human
-```
-
-### (e) Fix loop and escalation
+### Fix loop and escalation
 
 ```mermaid
 flowchart LR
@@ -198,109 +163,142 @@ flowchart LR
     C -->|"No, round 2"| H["Human decides"]:::human
 ```
 
-Rules: max 2 fix rounds (raise the builder role one step only after a failed round); fixes touch only the findings; a reviewer re-checks findings, not the whole diff; a
-finding a tool could have caught becomes a tool check; T3 never merges without a human.
-
-### Who does what (RACI-like)
-
-| Gate | Step | Human | Agent (model role) | Tool | Condition | Evidence |
-|---|---|---|---|---|---|---|
-| G0 | Request and classify | states request, confirms T3 | orchestrator (`mid`) picks tier | tier questions | always | tier line in plan |
-| G1 | Spec and abuse cases | approves | spec: `strong` at T3, `mid` at T2 | abuse-case template | T2 (tests listed), T3 (abuse cases) | approved spec, abuse case to test names |
-| G2 | Plan | OK for non-trivial work | `mid` writes numbered tasks | none | T1 to T3 | plan in `docs/plans/` with tier and reuse table |
-| G3 | Build with TDD | none | builder by tier: `small` T0/T1, `mid` T2/T3 | typecheck, changed tests (local) | always | red then green test, diff |
-| G4 | Tool gates | none | none (reads result) | lint, types, tests, diff coverage, depcruise, arch suite, build, bundle, SAST, gitleaks, audit; mutation on T3 (opt-in) | always, once in CI | CI run |
-| G5 | Specialist review | none | reviewers by path (table below) | CI output as input | T1 ui; T2/T3 per trigger | verdicts and findings with proof |
-| G6 | Release | approves at T3 (always); deploys rules and indexes | approver `strong` at T2; none at T0/T1 | branch ruleset | all merges | PR approval, green checks |
-| Feedback | Operate | triages | proposes tool checks for recurring findings | doctor, ratchets | after release | fewer findings of the same kind |
-
-**G0 by tool: `npx oneup-standards risk-tier [--base <ref>] [--json]`.** It classifies the diff by changed paths
-(highest tier of any file wins; exit code 0) and prints the tier, the reviewers to run and whether a human approval
-is required (T3 always). The orchestrator and CI use it to decide the review fan-out. Defaults: T3 = `src/app/actions/**`,
-`src/server/**`, `*.rules`, `**/auth*`, email templates, and paths containing money/payment/fee/role/token-style
-keywords; T2 = `src/lib/**`, `src/domain/**` and unknown source paths; T1 = `src/components/**`, styles; T0 = docs,
-tests, config (tests of guards or money still trigger `test-quality`). Replace the globs of a tier per project in
-`.standardsrc.json`:
-
-```json
-{ "riskTiers": { "T3": ["src/server/**", "billing/**"], "keywords": ["payment", "role"] } }
-```
-
-### Reviewer roles
-
-| Reviewer | Trigger paths | Model | Checklist | Tool-first checks (read, not re-run) |
-|---|---|---|---|---|
-| security | auth, actions, rules, payments, public routes, uploads | `strong` T3, `mid` T2 | `security-review.md` (OWASP Web + API Top 10) | SAST, gitleaks, audit, rules tests, mutation |
-| ui | `src/components`, styles | `mid` | `ui-review.md` + `ui-consistency` | lint, style ratchet, visual regression |
-| logic | services, domain, state machines | `mid` | `logic-review.md` | unit/service tests, coverage |
-| architecture | new folders, cross-layer imports, actions | `mid` | `arch-review.md` | depcruise, arch suite |
-| test-quality | tests of guards, money, state | `mid` | `test-quality.md` | coverage, mutation report |
-
-Checklists live in `skills/factory-review/references/`. The principles behind them: [What each reviewer checks](#what-each-reviewer-checks-the-principles).
-
-### What each reviewer checks: the principles
-
-Each rule is checkable. A tool checks first; the reviewer only judges what the tool cannot. The reference file carries the same list so reviewers get it without this README.
-
-**Architecture** (tool: depcruise, arch suite; file `arch-review.md`)
-- Write path is UI -> server action -> service -> adapter. No database write from UI code.
-- Every file under `src/server/` starts with `import 'server-only'`; the UI never imports from it.
-- Every exported action guards the caller in its body (or has an explicit public marker and a rate limit), validates input with a schema and returns `{ success, data | error, code? }`.
-- Identity, roles, owners, prices and recipients come from the server, never from the client.
-- Business rules live in services or the domain. The domain imports only domain and shared; adapters implement its ports.
-- No cross-layer import, no new entry in a ratchet or baseline file.
-
-**UI** (tool: lint, style ratchet, visual regression; files `ui-review.md`, skill `ui-consistency`)
-
-```mermaid
-flowchart LR
-    classDef tool fill:#a8e0b0,stroke:#23753a,color:#000
-    classDef layer fill:#a9cdf5,stroke:#1f5fa8,color:#000
-    T["Tokens<br/>@theme: raw values"]:::layer --> P["Primitives<br/>cva + cn, data-ui"]:::layer
-    P --> F["Feature components<br/>know the domain"]:::layer
-    F --> G["Pages<br/>compose only"]:::layer
-    R["Style ratchet,<br/>catalog, visual net"]:::tool -.-> P
-    R -.-> F
-```
-
-- Tokens: raw values (hex, rgb, palette classes, arbitrary px) exist only in the token layer. Missing step: add a token.
-- Primitives: variants via `cva`, classes merged with `cn()`, tokens only, `data-ui` hook, catalog entry, tests, visual-net entry. Decision test: "does it know the domain?" Yes: feature component. No: primitive.
-- Feature components use primitives; no hand-built buttons or overlays. `className` from the caller is for layout only.
-- Pages only compose.
-- The plan holds a reuse table (reuse vs new, with reason); the reviewer compares it to the diff.
-- Refactors keep a zero-pixel diff; ratchets and baselines only shrink.
-
-**Logic** (tool: unit/service tests, coverage; file `logic-review.md`)
-- Every spec rule and abuse case has a test that fails when the behaviour is removed.
-- State-machine truth table (state x event): no impossible combination, no second write path that skips the transition rule.
-- Legacy data matrix (old record shapes x read, display, write, migrate): each cell handled or explicitly out of scope.
-- Rounding, currency, time zones, double submit and retries are covered; error paths leave no partial write.
-
-**Security** (tool: SAST, gitleaks, audit, rules tests; file `security-review.md`)
-- OWASP Web Top 10 and API Security Top 10, one line per applicable item; each abuse case maps to a test.
-- Deny by default: allowed and denied cases for every rule, role and owner check; "signed in" is not authorization.
-- Server-side validation and ownership re-read; no secrets or confidential data in the client bundle; public endpoints rate-limited with reduced view models.
-
-**Test quality** (tool: coverage, mutation report; file `test-quality.md`)
-- Every allowed-case test has a denied twin (wrong role, owner, anonymous, expired, out of range).
-- A surviving mutant in a guard, comparison or calculation is a missing test.
-- Tests assert explicit values; regenerated snapshots prove nothing. No mocked authorization, no sleeps or real clocks.
-- Test names state the rule.
-
-### Tier x step
-
-| Step | T0 docs/mechanical | T1 UI | T2 logic | T3 security/money/roles |
-|---|---|---|---|---|
-| Spec | none | short brief | spec with tests | spec with abuse cases, each a test |
-| Builder | `small` | `small` | `mid` | `mid` |
-| Tool gates in CI | required | required | required | required, plus mutation and SAST |
-| Reviewers | none | ui, once per batch | logic, others by path | all by path, `strong` security with OWASP lines |
-| Fix rounds | n/a | max 2 | max 2 | max 2, then human |
-| Approver | CI green | CI green | agent approver (`strong`) | **human, always** |
+Rules for all agents:
+- **No self-approval:** the agent that writes the code never approves it; a reviewer is a fresh session with only spec, diff, abuse cases and CI output plus a specific attack brief.
+- **Tools before reviewers:** reviewers read CI output; they never re-run gates or repeat tool findings.
+- **Max 2 fix rounds,** then escalation to the human with the open findings. A round is: builder fixes only the findings, CI runs, the reviewer re-checks the findings (not the whole diff).
+- A finding a tool could have caught becomes a tool check.
+- **Evidence before assertions:** "this should work" is rejected without CI or terminal output.
 
 ---
 
-## 1. Secure SDLC (SSDLC) Phase Mapping
+## 2. What each reviewer checks
+
+Every rule is checkable. A tool checks first; the reviewer only judges what the tool cannot. The per-reviewer files in `skills/factory-review/references/` carry the detailed list and must agree with this summary.
+
+### Common to all reviewers
+
+| Topic | Definition |
+|---|---|
+| Triggered by | Changed paths (table below), not by default. At T3 all five run. |
+| Reads first | Spec, diff, abuse cases (T3), then the CI/tool output named in the table. Never re-runs gates, never reviews files outside the scope, never restyles. |
+| Finding vs pass | **blocker:** a proof (input or test) that a spec rule, abuse case, security, money or state invariant breaks, or a ratchet/baseline grew. **major:** a checklist rule is violated but no breakage is shown yet (e.g. allowed test without denied twin). **minor:** a hint; does not block and gets no fix round. A rule that does not apply is `n/a`, not a finding. |
+| Verdict | `approve` (no blocker, no major) \| `changes-requested` \| `escalate` (needs a human decision, or round 2 ends with open blockers). |
+| Output (max 40 lines) | `VERDICT`, then `FINDINGS`: id \| severity \| file:line \| proof \| fix hint, then `UNCHECKED`: what could not be verified and why. Security at T3 adds one OWASP line per applicable item: `A01 ok\|finding\|n/a - evidence`. |
+| Escalation | Round 2 with open blockers, or any `escalate`, goes to the human with the open findings. T3 additionally always needs the human approval. |
+
+| Reviewer | Trigger paths (default globs, see `risk-tier`) | Model role | Tool output read first | Detailed list |
+|---|---|---|---|---|
+| security | `src/app/actions/**`, `src/server/**`, `*.rules`, `auth*`, email templates, paths with money/payment/fee/role/token keywords, uploads, public routes; always at T3 | `strong` at T3, `mid` at T2 | SAST, gitleaks, audit, rules tests, mutation report | `security-review.md` |
+| ui | `src/components/**`, styles | `mid` (`small` for the checklist of a T1 batch) | lint, style ratchet, visual regression | `ui-review.md`, skill `ui-consistency` |
+| logic | `src/lib/**`, `src/domain/**`, `src/shared/**`, services, state machines, unknown source paths | `mid` | unit/service tests, coverage | `logic-review.md` |
+| architecture | new folders, changed imports across layers, `src/app/actions/**`, `src/server/**`, `src/domain/**`, depcruise config (never for T0) | `mid` | depcruise, arch suite | `arch-review.md` |
+| test-quality | tests of guards, money or state (test paths with guard/money words); always at T3 | `mid` | coverage, mutation report | `test-quality.md` |
+
+### Architecture (finding if a rule below is violated)
+- Write path is UI -> server action -> service -> adapter. No database write from UI code.
+- Every file under `src/server/` starts with `import 'server-only'`; the UI never imports from it.
+- Every exported action guards the caller in its body (or has an explicit public marker with reason and a rate limit), validates input with a schema and returns `{ success, data | error, code? }`; errors do not leak `error.message`; no unguarded helpers exported from actions.
+- Identity, roles, owners, prices and recipients come from the server, never from the client.
+- Business rules live in services or the domain. The domain imports only domain and shared; adapters implement its ports.
+- No cross-layer import (feature to app, service to action, domain to server), no new entry in a ratchet or baseline file.
+- Docs for roles, collections, upload paths, scripts and CI changed in the same change.
+
+### UI (finding if a rule below is violated; layers: [UI Consistency Guardrails](#ui-consistency-guardrails))
+- Tokens: raw values (hex, rgb, palette classes, arbitrary px) exist only in the token layer. Missing step: add a token.
+- Primitives: variants via `cva`, classes merged with `cn()`, tokens only, `data-ui` hook, catalog entry, tests, visual-net entry. Decision test: "does it know the domain?" Yes: feature component. No: primitive.
+- Feature components use primitives; no hand-built buttons or overlays. `className` from the caller is for layout only. Pages only compose.
+- The plan's reuse table (reuse vs new, with reason) matches the diff.
+- New page, modal or sheet has a visual-catalog entry; refactors keep a zero-pixel diff; ratchets and baselines only shrink.
+- Accessibility (label per control, visible focus, keyboard path, token contrast) and empty, loading, error and long-text states exist.
+
+### Logic (finding if a rule below is violated)
+- Every spec rule and abuse case has a test that fails when the behaviour is removed.
+- State-machine truth table (state x event): no impossible combination, no second write path (edit, import, retry) that skips the transition rule.
+- Legacy data matrix (old record shapes x read, display, write, migrate): each cell handled or explicitly out of scope.
+- Rounding, currency, units, time zones and range edges are covered; double submit, retry and concurrent edits are idempotent or transactional; error paths leave no partial write.
+- Output lists only failing cells and missing tests, each with the input that breaks it.
+
+### Security (finding if a rule below is violated; OWASP table below)
+- Enumerate every write path (actions, routes, rules, jobs, imports, edit and bulk twins) and who may call it; the edit twin of a guarded create is the usual bypass.
+- Deny by default: allowed and denied cases for every rule, role and owner check, using the real role lookup (never a mocked `isAdmin`); "signed in" is not authorization; anonymous is not staff.
+- Each guard is mutation-checked (remove or invert it once; a test must go red). Stored-markup sanitizers are fuzzed in a real browser.
+- Server-side validation (trimmed, capped, closed enums, bounded arrays and files) and ownership re-read; no secrets or confidential data in the client bundle; links only `https:`.
+- Public endpoints: rate-limited, idempotent, reduced view models (no PII); a short or guessable code is never a credential.
+- Each abuse case maps to a test; no state combination the model forbids (paid but not approved).
+
+| OWASP item (Web 2021 / API 2023) | What the security reviewer checks | Tool-first check |
+|---|---|---|
+| A01, API1, API5 Access control (object and function level) | Every action guards in its body; ownership/role re-read server-side; edit and bulk twins too; rules deny by default | arch suite action guards, rules tests |
+| A02 Cryptographic failures | No secrets in client vars; tokens from a CSPRNG; HSTS/CSP headers | gitleaks, `check-bundle`, header test |
+| A03 Injection | Zod at the boundary; no string-built queries or paths; no `dangerouslySetInnerHTML` | ESLint security, Semgrep/CodeQL |
+| A04, API6 Insecure design, sensitive business flows | Abuse cases exist and are tests; booking, payment, invites limited per actor and idempotent | abuse-case section present, rate-limit and repeat-call tests |
+| A05, API8 Misconfiguration | Security headers, no wildcard CORS or verbose errors, rules and indexes deployed by a human | header and rules tests |
+| A06 Vulnerable components | No new unvetted dependency; actions pinned | `npm audit`, Dependabot |
+| A07, API2 Authentication | Verified token on the server; anonymous is not staff; capability tokens long, random, expiring | action guard tests with real role lookup, token tests |
+| A08, API10 Integrity, unsafe API consumption | CI actions pinned; migrations reversible or dry-run; inbound webhooks validated and signature-checked | pin check, invalid-signature test |
+| A09 Logging | Server-side audit entry with verified uid, time, reason; no PII in logs | audit assertion in tests |
+| A10, API7 SSRF | Server fetches only allow-listed hosts; user URLs scheme-checked | Semgrep SSRF rule |
+| API3 Property-level authorization | Responses are reduced view models; the client cannot write role, price, owner, status | mapper tests with explicit fields |
+| API4 Resource consumption | Page, body, upload and array caps; rate limit on public endpoints | Zod bounds, rate-limit test |
+| API9 Inventory | No orphan or debug actions/routes; every public action marked with a reason | arch suite public-action list |
+
+### Test quality (finding if a rule below is violated)
+- Every allowed-case test has a denied twin (wrong role, owner, anonymous, expired, out of range).
+- A surviving mutant in a guard, comparison or calculation is a missing test. Without the mutation tool: invert each guard by hand once and confirm a test goes red.
+- Tests assert explicit values; regenerated snapshots prove nothing. No mocked authorization, no sleeps, real clocks or network.
+- Test names state the rule. Output: surviving mutants (file:line, operator) and the missing test for each.
+
+---
+
+## 3. Adopt it: new and existing projects
+
+**Which command when**
+
+| Situation | Command |
+|---|---|
+| First time in a project (new or existing) | `npx oneup-standards init` (wizard, 8 steps; `--yes` accepts recommended answers; `--with sast,sca` adds opt-in checks) |
+| Is the project healthy? Drift, hooks, skills, readiness checklist | `doctor` (exit 2 if the project was never connected: run `init`) |
+| After bumping the package version | `upgrade --dry-run`, then `upgrade` (`--merge` for customized CI/PR template, `--force` replaces and keeps `.bak`) |
+| Refresh only the shared rules in `AGENTS.md`/`CLAUDE.md`/`GEMINI.md` | `sync-agents` (once per machine: `sync-agents --global`) |
+| Install AI skills for Antigravity and Claude Code | `sync-skills` (`--project`: workspace only), verify with `check-skills` |
+| Freeze legacy violations | `baseline` |
+| Opt-in SAST, SCA, mutation, DAST | `add <sast\|sca\|mutation\|dast\|all>` |
+| Require PR and checks on GitHub | `protect-branch` (dry run), then `--apply` |
+
+**New project**
+
+```bash
+npx create-next-app@latest my-app && cd my-app && git init
+npm install --save-dev github:oneup4real/engineering-standards#semver:^1.0.0
+npx oneup-standards init      # then: brew install gitleaks (Windows: winget install gitleaks)
+```
+
+1. `init` writes configs, hooks, CI, PR template and the `AGENTS.md` block; it ends with a readiness checklist (what is set up, the command per missing item, what only you can do).
+2. Commit, push a feature branch, open the first PR with `pr`, then make the checks mandatory ([section 9](#9-make-the-checks-mandatory-on-github)).
+3. No baseline is needed: there are no legacy violations.
+
+**Existing project**: bring legacy code under governance without a red pipeline on day one.
+
+```bash
+npm install --save-dev github:oneup4real/engineering-standards#semver:^1.0.0
+npx oneup-standards init
+brew install gitleaks     # Windows: winget install gitleaks
+```
+
+The wizard automates the migration:
+- **Smart CI and workflow merging:** keeps your jobs in `.github/workflows/ci.yml` (emulators, Docker services), injects the shared `security` job (Semgrep SAST, Gitleaks, audit); `ci.yml.bak` is always saved.
+- **PR template merging:** keeps custom sections, injects missing standard sections and checklists.
+- **ESLint and TypeScript:** keeps existing local rules via `eslint.config.local.mjs` while adding the shared security rules.
+- **Freezes legacy violations:** creates `.dependency-cruiser-known-violations.json`, so only *new* violations fail.
+- **Confidential markers:** configures strings (e.g. `CUST-`) in `.standardsrc.json` that must never appear in client JS bundles.
+- **Hooks:** Husky pre-commit and pre-push.
+
+Then: review the changes, commit on a branch, `pr`, merge, `finish --apply`. From then on only new violations fail; pay legacy debt down with the ratchet flow ([Appendix C](#appendix-c-monotonic-ratchets--managing-legacy-debt)). Suggested order for many findings: P0 security issues first (exposed data, missing authorization, secrets); move database writes behind server actions one feature at a time; guard every server action; then clear architecture violations until the baseline file is empty. More in [docs/adoption.md](docs/adoption.md); layer reference in [docs/architecture.md](docs/architecture.md).
+
+---
+
+## 4. Secure SDLC (SSDLC) phase mapping
 
 `@oneup4real/standards` aligns modern AI-assisted engineering with the classical **Secure Software Development Lifecycle (SSDLC)** (NIST SSDF SP 800-218, OWASP SAMM, Microsoft SDL):
 
@@ -316,7 +314,7 @@ graph LR
 
 ### Detailed Phase Breakdown
 
-G-numbers refer to the gates in [the delivery flow](#the-delivery-flow-who-does-what-when).
+G-numbers refer to the gates in [the delivery flow](#1-the-delivery-flow-who-does-what-when).
 
 | SSDLC Phase | Classical Activities (NIST / OWASP) | Threats & AI Failure Modes Mitigated | Enforcement Mechanism & Tools Used | Responsibility / Gate |
 |---|---|---|---|---|
@@ -329,77 +327,7 @@ G-numbers refer to the gates in [the delivery flow](#the-delivery-flow-who-does-
 
 ---
 
-## 2. SSDLC Pipeline & Architecture Flow
-
-The following diagram illustrates how changes travel from prompt to production across the multi-layered defense-in-depth pipeline:
-
-```mermaid
-flowchart TD
-    subgraph P1["Phase 1: Requirements & Threat Modeling"]
-        HumanLead[Human Lead & Product] -->|1. Clarify Requirements| Brainstorm[brainstorming & writing-plans]
-        Brainstorm -->|2. Threat Analysis| STRIDE[Define Trust Boundaries\nAuthZ & Data Exposure Rules]
-    end
-
-    subgraph P2["Phase 2: Secure Architecture & Design"]
-        STRIDE --> ArchDesign[Clean Architecture Layers\nUI → Actions → Services → Adapters]
-        ArchDesign --> ZodContracts[Zod Input Validation Contracts\n& Deny-by-Default Firestore Rules]
-    end
-
-    subgraph P3["Phase 3: Secure Coding & Shift-Left Dev (Workstation)"]
-        ZodContracts -->|Task Dispatch| Agent[AI Implementer Subagent]
-        Agent -->|3. Test-First TDD| Code[Write Failing Test → Implement Code]
-        Code -->|git commit| HookCommit[Husky Pre-Commit Gate]
-        HookCommit -->|Scan 1| ScanFiles[oneup-standards check-files\nBlock .env, keys, office docs]
-        HookCommit -->|Scan 2| GitleaksLocal[gitleaks protect --staged\nSecret Scan]
-        HookCommit -->|Scan 3| LintStaged[lint-staged\neslint --max-warnings=0]
-        
-        HookCommit -->|Pass| CommitOK[Commit Staged]
-        CommitOK -->|git push| HookPush[Husky Pre-Push Gate]
-        HookPush -->|Check 4| TscLocal[tsc --noEmit\nStrict Typecheck]
-        HookPush -->|Check 5| VitestLocal[npm test\nUnit Tests Pass]
-    end
-
-    subgraph P4["Phase 4: Automated CI Verification & Security Testing"]
-        HookPush -->|Pass & Push| PR[Pull Request Opened]
-        PR --> CI_Job[ci-node.yml @v1]
-        PR --> Sec_Job[security.yml @v1]
-        
-        CI_Job --> CI_Drift[oneup-standards doctor --warn-only\nDetect Config Drift]
-        CI_Job --> CI_TDD[check-tests-changed\nEnforce TDD: source changed ⇒ test changed]
-        CI_Job --> CI_DiffCov[check-diff-coverage\nChanged-line coverage >= 80%]
-        CI_Job --> CI_Arch[dependency-cruiser\nLayer boundary rules]
-        CI_Job --> CI_Suite[arch/suite.js\nServer-only, Action guards, Write ratchet]
-        CI_Job --> CI_Emul[firebase-testing\nEmulated database rules tests]
-        CI_Job --> CI_Build[npm run build\nProduction compile]
-        CI_Job --> CI_Bundle[check-bundle\nScan built JS for confidential markers]
-
-        Sec_Job --> Sec_Leaks[gitleaks --full-history\nFull git history audit]
-        Sec_Job --> Sec_Audit[npm audit\nSCA dependency vulnerability scan]
-        Sec_Job --> Sec_SAST[Semgrep / CodeQL\nSAST code security scan]
-    end
-
-    subgraph P5["Phase 5: Secure Release & Deployment"]
-        CI_Job --> DualControl[Specialist Reviewers by tier\nFour-Eyes Verification]
-        Sec_Job --> DualControl
-        DualControl --> HumanApproval{Human Lead Review\n& PR Approval}
-        HumanApproval -->|Merge to default branch| GitHubRuleset[GitHub Branch Ruleset\nBlock force push & require green checks]
-        GitHubRuleset --> ProductionDeploy[Production Release\nNext.js securityHeaders: CSP, HSTS, XFO]
-        ProductionDeploy --> HumanRulesDeploy[Security Rules Deployment\nHuman only, never automated]
-    end
-
-    subgraph P6["Phase 6: Operations & Fleet Governance"]
-        CentralRepo[oneup4real/engineering-standards] -->|Dependabot Bump PR| ProjectRepo[Project Repository]
-        ProjectRepo --> DoctorCheck[oneup-standards doctor\nContinuous Drift Audit]
-        DoctorCheck --> UpgradeApply[oneup-standards upgrade\nSHA-256 Anti-Drift Sync]
-        ProjectRepo --> RatchetTrack[Monotonic Ratchets\nViolations must only decrease]
-    end
-
-    P6 -.->|Harvest Best Practices| P1
-```
-
----
-
-## 3. Tools Used & Risk Mitigation Matrix
+## 5. Tools and risk mitigation matrix
 
 Every tool incorporated into `@oneup4real/standards` is targeted at specific real-world security vulnerabilities and common failure modes of AI coding agents:
 
@@ -420,7 +348,7 @@ Every tool incorporated into `@oneup4real/standards` is targeted at specific rea
 | **`ui-consistency` skill + style ratchet** | Design & Coding | AI styles each screen in isolation: one-off font sizes (`text-[10.5px]`), hand-built pills and modals next to existing primitives, drifting spacing and radii. | **UI Integrity**: Primitives are reused, tokens are enforced, and arbitrary style values can only decrease. |
 | **Specialist reviewers by tier (`factory-review`)** | Design & Coding | Single agent "cheating" its own evaluation, hallucinating test results, or deviating from plan; blanket reviews that re-run what tools already prove. | **Four-Eyes Governance**: Separates the implementer from path-triggered, fresh-context specialist reviewers; T3 needs a human. |
 
-### Defense-in-Depth: SAST vs. Linting vs. Testing
+### Defense-in-depth: SAST vs. linting vs. testing
 
 A common question in engineering teams is: *why do we need three separate verification tools, and where should each one run?*
 
@@ -442,16 +370,11 @@ flowchart LR
 | **Workstation Linting** | **ESLint** | Workstation (pre-commit) & CI | Catches forbidden AST syntax patterns (direct client DB writes, secrets in `NEXT_PUBLIC_*`, `any` type casts). | Sub-second AST parsing blocks dangerous patterns before code is ever committed to local history. |
 | **Deep Code Analysis (SAST)** | **Semgrep** / **CodeQL** | GitHub Actions CI (PR & Push) | Semantic taint-tracking, SSRF, injection vulnerabilities, prototype pollution across file boundaries. | Comprehensive vulnerability rule suites require containerized runtimes and multi-file AST indexing, which would unacceptably slow down local git commit workflows. |
 
-> **What happens if someone pushes directly to `main` without a Pull Request?**
-> Local Husky hooks (`pre-commit` and `pre-push`) still run on the developer's machine. However, human engineers or automated scripts could bypass local hooks using `--no-verify`. Furthermore, SAST security scans (Semgrep/CodeQL) run in GitHub Actions.
-> 
-> To guarantee that code cannot reach production without running SAST:
-> 1. Both `ci-node.yml` and `security.yml` trigger on both `pull_request` **and** `push: branches: [main]`. If a direct push occurs, GitHub Actions still executes all security scans and alerts if vulnerabilities exist.
-> 2. **Enforce Branch Rulesets:** As documented in [Section 10](#10-make-the-checks-mandatory-on-github), repositories must enable GitHub Branch Rulesets that block direct pushes to `main` and require all pull request checks to pass before merging.
+> **Direct push to `main`?** Local hooks can be bypassed with `--no-verify`, so the real guard is on GitHub: a branch ruleset or `protect-branch` blocks direct pushes and requires a pull request with green checks ([section 9](#9-make-the-checks-mandatory-on-github)). As a second net, a project's `ci.yml` normally also triggers on `push` to `main`, so SAST and secret scans still run and alert.
 
 ---
 
-## 4. Architectural Guardrails & Threat Boundaries
+## 6. Architectural guardrails and threat boundaries
 
 Applications using these standards follow a strict layered Clean Architecture:
 
@@ -555,7 +478,7 @@ how it looks:
    scale in the "UI catalog" section of its `AGENTS.md`.
 3. **CI level:** the style ratchet (`checkStyleRatchet`) counts arbitrary Tailwind values outside the primitives
    folder: `text-[11px]`, `rounded-[18px]`, `p-[13px]`, `bg-[#0062e0]`. `var(--token)` values and widths/heights are
-   not counted. Counts are frozen once by the human and may only go down (see Appendix C).
+   not counted. Counts are frozen once by the human and may only go down (see [Appendix C](#appendix-c-monotonic-ratchets--managing-legacy-debt)).
 
 **Enable the style ratchet in a project:**
 
@@ -583,26 +506,9 @@ Then the human runs `npx oneup-standards baseline` once and commits `ui-style-ba
 
 ---
 
-## 5. Specialist Review Protocol (Dual Control)
+## 7. Cross-harness AI skill governance
 
-Non-trivial tasks in projects using `@oneup4real/standards` follow the protocol in `AGENTS.global.md` and the
-`factory-review` skill; the sequence is the delivery flow above (gates G0 to G6). In short: the implementer
-builds test-first, tools gate in CI once, and fresh-context specialist reviewers (triggered by changed paths,
-sized by risk tier) read that evidence and attack what tools cannot check.
-
-### Core Rules for AI Agents
-- **No Self-Approval:** the agent that writes the code never approves it.
-- **Fresh-Context Skeptical Reviewer:** reviewers get only spec, diff, abuse cases and CI output, plus a specific attack brief (`reviewer-brief-template.md`).
-- **Tools Before Reviewers:** reviewers read CI output and never re-run gates or repeat tool findings.
-- **Max 2 Fix Rounds**, then escalation to the human with the open findings.
-- **T3 Needs a Human:** security, money, roles, public endpoints and data migrations are never merged on agent approval alone.
-- **Evidence Before Assertions:** "this should work" is rejected without CI or terminal output.
-
----
-
-## 6. Cross-Harness AI Skill Governance (Antigravity & Claude Code)
-
-Modern engineering teams often switch between **Claude Code CLI** and **Google Antigravity IDE** (frequently selecting Claude models like Sonnet 3.7 or Sonnet 3.5 directly inside Antigravity) — or work exclusively in Antigravity.
+Modern engineering teams often switch between **Claude Code CLI** and **Google Antigravity IDE** (often running Claude models directly inside Antigravity) — or work exclusively in Antigravity.
 
 ### The Cross-Harness Problem
 1. **Harness Sandbox Boundary:** Claude Code stores plugins in `~/.claude/plugins/cache/`. When you run Claude *inside Antigravity*, Antigravity acts as the host harness. Its security policy explicitly blocks tools from reading foreign tool directories (`Permission denied: Matches default system policy`).
@@ -612,7 +518,7 @@ Modern engineering teams often switch between **Claude Code CLI** and **Google A
 
 ### Machine-Enforced Skill Protection
 
-`@oneup4real/standards` provides four layers of machine enforcement to guarantee required skills are active across both Claude Code and Antigravity:
+`@oneup4real/standards` provides five layers of machine enforcement to guarantee required skills are active across both Claude Code and Antigravity:
 
 ```mermaid
 graph TD
@@ -624,7 +530,7 @@ graph TD
         SessionStart["AI Agent Starts Turn\n(Antigravity / Claude Code)"]
         SessionStart --> CheckSkills{"Are Required Skills Loaded?\n(TDD, plans, debugging, design)"}
         CheckSkills -->|Missing| Halt["⛔ HALT IMMEDIATELY\nAlert Engineer to run sync-skills\nRefuse to write code"]
-        CheckSkills -->|All Present| CodeAllowed["Proceed with TDD & Dual Control"]
+        CheckSkills -->|All Present| CodeAllowed["Proceed with TDD & specialist review"]
         
         DoctorCheck["oneup-standards doctor / check-skills"] -->|Audit| SkillsStatus["Flag missing skills as actionable warnings"]
     end
@@ -633,7 +539,7 @@ graph TD
 ```
 
 #### 1. Zero-Forget AI Pre-Flight Gate (`AGENTS.global.md`)
-Section 0 of `AGENTS.global.md` instructs every AI model at the prompt level:
+Section 0 of `AGENTS.global.md` (rules for tiers and roles: section 1b) instructs every AI model at the prompt level:
 - Before writing code, the agent MUST verify that essential skills (`brainstorming`, `writing-plans`, `executing-plans`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `requesting-code-review`, `frontend-design`, `superdesign`, `ui-consistency`, `factory-review`) are loaded in its context.
 - **Halt Condition:** If any core skills are missing, the agent **stops immediately** and alerts the developer:
   > ⚠️ **Required AI Skills Missing!** Run `npx oneup-standards sync-skills` in your terminal to synchronize your skills into Antigravity, then restart this conversation.
@@ -679,59 +585,7 @@ after a package upgrade; `upgrade` or `sync-skills` refreshes them.
 
 ---
 
-## 7. Quickstart: New Projects
-
-
-Create your project, initialize git, and run the wizard:
-
-```bash
-npx create-next-app@latest my-app
-cd my-app
-git init
-npm install --save-dev github:oneup4real/engineering-standards#semver:^1.0.0
-npx oneup-standards init
-```
-
-The interactive wizard asks 8 clear questions, selects recommended Secure SDLC settings, writes configs, and installs hooks. (Pass `--yes` to accept all recommended defaults non-interactively).
-
----
-
-## 8. Quickstart: Existing Projects
-
-You can bring legacy codebases under standards governance without turning your entire CI pipeline red on day one:
-
-```bash
-# Step 1: Install standards package directly from GitHub
-npm install --save-dev github:oneup4real/engineering-standards#semver:^1.0.0
-
-# Step 2: Run interactive wizard
-npx oneup-standards init
-```
-
-The wizard guides you through setup and automates the migration:
-- **Smart CI & Workflow Merging (Recommended):** If your repository already has `.github/workflows/ci.yml` (e.g. Firebase emulator runners, Docker services, custom test setups), the wizard preserves your existing jobs and injects the shared security scans (`security` job with Semgrep SAST, Gitleaks, and audit). A backup (`ci.yml.bak`) is always saved.
-- **Pull Request Template Merging:** Preserves custom template sections and injects missing standard sections (like TDD Verification) and checklists.
-- **Merges ESLint & TypeScript rules:** Keeps existing local rules via `eslint.config.local.mjs` while adding shared security rules.
-- **Freezes Legacy Architecture Violations:** Automatically creates `.dependency-cruiser-known-violations.json` so current code passes CI and only *new* violations fail.
-- **Prompts for Confidential Markers:** Configures strings (e.g. `CUST-` or `INTERNAL-`) in `.standardsrc.json` that must never appear in client JS bundles.
-- **Installs Git Hooks:** Configures Husky pre-commit and pre-push verification.
-
-```bash
-# Step 3: Ensure secret scanner is installed on your machine
-brew install gitleaks     # Windows: winget install gitleaks
-
-# Step 4: Review changes, commit, and push
-git add -A
-git commit -m "chore: adopt engineering-standards"
-git push
-```
-
-From this point forward, **only new violations fail**. Existing legacy violations can be resolved incrementally over time.
-
-
----
-
-## 9. Fleet Anti-Drift: Doctor & Upgrade
+## 8. Fleet anti-drift: doctor and upgrade
 
 As `@oneup4real/standards` evolves, how do you prevent older projects from becoming out-of-date?
 
@@ -781,9 +635,7 @@ npx oneup-standards upgrade --force
 
 ### Smart Non-Destructive Merging (`--merge`)
 
-When a project edits a managed file (for instance, adding a Firebase emulator runner or Docker service into `.github/workflows/ci.yml`), `doctor` identifies the file as `customized`. Previously, developers faced an all-or-nothing choice: skip upgrades forever or overwrite customizations with `--force`.
-
-With `npx oneup-standards upgrade --merge`, files are merged using AST-aware mergers:
+When a project edits a managed file (for instance, adding a Firebase emulator runner to `.github/workflows/ci.yml`), `doctor` reports it as `customized`. Instead of choosing between skipping upgrades and overwriting with `--force`, `upgrade --merge` combines both using AST-aware mergers:
 
 ```mermaid
 flowchart TD
@@ -805,14 +657,11 @@ flowchart TD
 1. **YAML Workflows (`ci.yml`):** Uses native YAML AST parsing to preserve comments, indentation, and custom jobs (like Firebase emulator setups). If your project already has a test runner, it retains it and injects the central `security` job (`security.yml@v1` with Semgrep, Gitleaks, and audit).
 2. **Markdown Files (`pull_request_template.md`):** Parses Markdown `## ` sections. Keeps your custom PR description templates intact while injecting missing standards sections (such as *Tests (test-driven development)*) and checklist items (`- [ ]`).
 3. **JSON Configs (`.lintstagedrc.json`):** Preserves custom file-match patterns while adding missing standards linters.
-4. **Safety & Rollback:** Before modifying any customized file, `upgrade --merge` creates an exact timestamped `.bak` copy.
-5. **Drift Resolution:** Once merged, the file's SHA-256 hash is recorded in `.standardsrc.json` under `config.merged[relFile]`. Subsequent runs of `oneup-standards doctor` recognize the customized file as up to date (`ok`).
+4. **Safety:** a timestamped `.bak` copy is written before any customized file changes; the merged hash is recorded under `config.merged[relFile]`, so `doctor` reports the file as `ok` (see [Appendix B](#appendix-b-cryptographic-anti-drift-fingerprinting)).
 
----
+## 9. Make the checks mandatory on GitHub
 
-## 10. Make the Checks Mandatory on GitHub
-
-Local hooks catch mistakes on your machine, but GitHub branch protection prevents anyone (human or agent) from bypassing them with `--no-verify`.
+Local hooks catch mistakes on your machine, but GitHub branch protection prevents anyone (human or agent) from bypassing them with `--no-verify`. It is also what enforces the [pull request flow](#1-the-delivery-flow-who-does-what-when): nobody pushes to `main`, only a human merges.
 
 ### 1. Branch Ruleset (Repository Settings → Rules → Rulesets)
 Create a ruleset targeting the default branch:
@@ -828,16 +677,13 @@ Create a ruleset targeting the default branch:
 ### 2. Code Security (Repository Settings → Code security)
 - Enable **Secret scanning** and **Push protection**.
 
-> **Why Branch Rulesets are Non-Negotiable:**
-> Local git hooks run only on the local machine and can be bypassed by humans or misconfigured bots using `--no-verify`. Furthermore, SAST vulnerability scans (Semgrep/CodeQL) run in GitHub Actions. Enforcing branch rulesets guarantees that **all** code must pass SAST, secret audits, and architecture checks in CI before it can be merged into production.
+> **Why this is non-negotiable:** local hooks can be bypassed with `--no-verify` and SAST runs only in CI. A ruleset guarantees that **all** code passes SAST, secret audits and architecture checks before it can be merged.
 
-*(If you have the GitHub CLI installed, `npx oneup-standards init` can automatically create this ruleset for you).*
-
-Quicker, with classic branch protection: `npx oneup-standards protect-branch` prints the exact API payload and the click path (dry run). Add `--apply` to send it through `gh`. Flags: `--branch main`, `--checks "ci / ci,security / audit"` (default: the check runs of the latest commit, if `gh` is available), `--approvals 0` (a human merges; raise it for a second reviewer), `--include-admins` (admins cannot bypass either). It needs admin rights, and private repositories need a paid GitHub plan. `doctor` hints when the default branch is unprotected (never in CI).
+With `gh` installed, `init` (step 8/8) can create this ruleset for you. Quicker alternative, classic branch protection: `npx oneup-standards protect-branch` prints the exact API payload and the click path (dry run). Add `--apply` to send it through `gh`. Flags: `--branch main`, `--checks "ci / ci,security / audit"` (default: the check runs of the latest commit, if `gh` is available), `--approvals 0` (a human merges; raise it for a second reviewer), `--include-admins` (admins cannot bypass either). It needs admin rights, and private repositories need a paid GitHub plan. `doctor` hints when the default branch is unprotected (never in CI).
 
 ---
 
-## 11. What Happens When (Pipeline Breakdown)
+## 10. What happens when
 
 | Event | Execution Target | Checks Executed | Fail Conditions |
 |---|---|---|---|
@@ -849,7 +695,7 @@ Quicker, with classic branch protection: `npx oneup-standards protect-branch` pr
 
 ---
 
-## 12. A Check Failed. What Now?
+## 11. A check failed. What now?
 
 | Failure Message / Symptom | Root Cause | Proper Remediation |
 |---|---|---|
@@ -867,16 +713,16 @@ Quicker, with classic branch protection: `npx oneup-standards protect-branch` pr
 
 ---
 
-## 13. CLI Commands Reference
+## 12. CLI commands reference
 
-All commands are available via `npx oneup-standards <command>`:
+All commands run as `npx oneup-standards <command>` (`--help` lists them). Daily: `doctor`, `risk-tier`, `pr`, `finish`, `add`. Which command when: [section 3](#3-adopt-it-new-and-existing-projects).
 
 | Command | Arguments / Flags | Description |
 |---|---|---|
-| `init` | `[--yes] [--with <features>]` | Interactive setup wizard for new or existing projects (`--yes` accepts recommended answers). |
-| `doctor` | `[--warn-only]` | Diagnoses configuration drift, missing hooks, outdated templates, AI skills, displays active monotonic ratchets / technical debt and a readiness checklist (OK / missing / n/a, exact command per item, what you still do yourself). |
-| `upgrade` | `[--merge] [--force] [--dry-run]` | Safely synchronizes template files, hooks, and AI rules. Uses `--merge` to combine customized files, or `--force` to replace. |
-| `sync-skills` | `[--project] [--dry-run]` | Synchronizes plugin skills (`superpowers`, `frontend-design`, `superdesign`, …) into Antigravity (`~/.gemini/config/skills`) and installs the package's own skills (`ui-consistency`) for Antigravity and Claude Code (`~/.claude/skills`). |
+| `init` | `[--yes] [--with <features>]` | Interactive 8-step setup wizard for new or existing projects (`--yes` accepts recommended answers; `--with sast,sca` adds opt-in checks). |
+| `doctor` | `[--warn-only]` | Diagnoses drift, hooks, outdated templates, AI skills; shows ratchet debt and a readiness checklist (OK / missing / n/a, exact command per item, what you still do yourself). `--warn-only` emits GitHub annotations and exits 0. Exit 2 if the project is not connected. |
+| `upgrade` | `[--merge] [--force] [--dry-run]` | Synchronizes managed templates, hooks and the AI rules block. Never overwrites customized files unless `--merge` (combine) or `--force` (replace, keeps `.bak`). |
+| `sync-skills` | `[--project] [--dry-run]` | Synchronizes plugin skills (`superpowers`, `frontend-design`, `superdesign`, …) into Antigravity (`~/.gemini/config/skills`) and installs the package's own skills (`ui-consistency`, `factory-review`) for Antigravity and Claude Code (`~/.claude/skills`). |
 | `check-skills` | none | Verifies required AI skills (`test-driven-development`, `brainstorming`, `superdesign`, etc.) are installed in Antigravity. |
 | `baseline` | none | Generates `.dependency-cruiser-known-violations.json`, `.eslint-suppressions.json` and, when `uiStyleRatchet` is configured, the UI style baseline, freezing existing violations into monotonic ratchets. |
 | `sync-agents` | `[--global]` | Refreshes managed shared rules in `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`. `--global` writes only a short bootstrap block into `~/.agents/AGENTS.md` (and `~/.codex/AGENTS.md`), replacing an old full block and keeping your text. |
@@ -885,16 +731,15 @@ All commands are available via `npx oneup-standards <command>`:
 | `protect-branch` | `[--branch main] [--checks a,b] [--approvals 0] [--include-admins] [--apply]` | Dry run by default: prints the GitHub branch-protection payload and the click path. `--apply` sends it with `gh` (admin rights; private repos need a paid plan). |
 | `check-files` | `[paths...]` | Fails if specified paths (default: staged files) contain office docs, keys, or `.env` files. |
 | `check-bundle` | `[--dir <path>]` | Scans production JavaScript bundles for confidential markers configured in `.standardsrc.json`. |
-| `check-tests-changed` | `--base <git-ref>` | Enforces TDD by failing if source code changed without corresponding test modifications. |
-| `check-diff-coverage` | `--base <ref> [--min 80]` | Fails if newly added or modified lines have less than the required test coverage percentage. |
-| `hook` | `pre-commit \| pre-push` | Executes git hook sequences orchestrated by Husky. |
-| `risk-tier` | `[--base <ref>] [--json] [paths...]` | Classifies the diff into T0-T3 by changed paths (globs configurable under `riskTiers` in `.standardsrc.json`), prints tier, reviewers and whether a human approval is required. Always exits 0 (2 on usage errors). |
-| `add` | `<sast\|sca\|mutation\|dast\|all> [--force] [--dry-run]` | Opt-in security templates, never installed by default: Semgrep rules for server actions + CI job, `npm audit` severity gate, Stryker config + changed-files CI job, nightly OWASP ZAP baseline. Same via `init --with sast,sca`. All report only until a repository variable switches blocking on (see `docs/adoption.md`). |
+| `check-tests-changed` | `--base <git-ref>` or explicit paths | Enforces TDD by failing if source code changed without corresponding test modifications. |
+| `check-diff-coverage` | `--base <ref> \| --diff-file <f>` `[--min 80] [--lcov coverage/lcov.info] [--if-present]` | Fails if newly added or modified lines have less than the required test coverage percentage. |
+| `hook` | `pre-commit \| pre-push` | Runs the git hook sequences installed by Husky. |
+| `risk-tier` | `[--base <ref>] [--json] [paths...]` | Classifies the diff into T0-T3 by changed paths (default base `origin/main`; globs configurable under `riskTiers` in `.standardsrc.json`), prints tier, reviewers and whether a human approval is required. Exit 0 (2 on usage errors). |
+| `add` | `<sast\|sca\|mutation\|dast\|all> [--force] [--dry-run]` | Opt-in security templates, never installed by default: Semgrep rules for server actions + CI job, `npm audit` severity gate, Stryker config + changed-files CI job, nightly OWASP ZAP baseline. Same via `init --with sast,sca`. All report only until a repository variable switches blocking on (see [docs/adoption.md](docs/adoption.md)). |
 
 ---
 
-## 14. Importable Building Blocks
-
+## 13. Importable building blocks
 
 Projects consuming `@oneup4real/standards` can import standard presets directly:
 
@@ -913,7 +758,7 @@ Projects consuming `@oneup4real/standards` can import standard presets directly:
 
 ---
 
-## 15. Appendices (Deep Technical Details)
+## 14. Appendices
 
 ### Appendix A: The Three Delivery Channels
 
@@ -1073,7 +918,6 @@ Monitor technical debt reduction over time using `doctor`:
 ```bash
 npx oneup-standards doctor
 ```
-Every sprint or milestone, teams celebrate the downward trajectory of their ratchets until debt reaches zero.
 
 ---
 
@@ -1099,3 +943,4 @@ In compliance with enterprise Secure SDLC standards (ISO 27001, SOC 2, SLSA):
   uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
   ```
 - **Pinned Secret Scanner Binary:** Rather than using third-party composite actions that may execute untrusted node dependencies, `security.yml` downloads the official `gitleaks` binary directly from GitHub releases, validates its cryptographic SHA-256 checksum, and executes it in isolation.
+

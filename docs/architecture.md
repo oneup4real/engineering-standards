@@ -41,7 +41,7 @@ Button click (client component)
 
 ## Classifying findings
 
-Use these buckets in security reviews and issues.
+Use these buckets in security reviews and issues. Reviewer verdicts in the pull request use `blocker`/`major`/`minor` (README section 2); when filing an issue map blocker to P0/P1, major to P2, minor to P3.
 
 | Severity | Meaning | Response |
 |---|---|---|

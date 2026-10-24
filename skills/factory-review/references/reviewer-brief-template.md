@@ -12,6 +12,9 @@ DO NOT: re-run gates, restyle, refactor, review files outside SCOPE, repeat tool
 OUTPUT (max 40 lines):
   VERDICT: approve | changes-requested | escalate
   FINDINGS: id | severity (blocker/major/minor) | file:line | proof (input or test that breaks) | fix hint
+    blocker = proof that a spec rule, abuse case, security/money/state invariant breaks, or a ratchet grew
+    major   = checklist rule violated, no breakage shown yet; minor = hint, never blocks, no fix round
+    approve only with no blocker and no major
   UNCHECKED: what you could not verify and why
 ```
 

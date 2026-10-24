@@ -2,7 +2,7 @@
 
 ## New project
 
-Run `npx oneup-standards init` right after creating the project (see README §2). There are no existing
+Run `npx oneup-standards init` right after creating the project (see [README section 3](../README.md#3-adopt-it-new-and-existing-projects)). There are no existing
 violations, so skip the baseline.
 
 ## Existing project: the ratchet approach
@@ -57,11 +57,11 @@ This writes a short bootstrap block (not the full standard) into `~/.agents/AGEN
 
 - Ruleset on the default branch: restrict deletions, block force pushes, require a pull request, and require status
   checks `ci / ci`, `security / gitleaks`, `security / audit`, and `security / semgrep` or `security / codeql`.
-- Quick setup of the first bullet: `npx oneup-standards protect-branch` (dry run), then `--apply`. Agents push feature branches and open pull requests; only a human merges.
+- Quick setup of the first bullet (classic branch protection; `init` can create the ruleset instead): `npx oneup-standards protect-branch` (dry run), then `--apply`. Agents push feature branches and open pull requests; only a human merges.
 - Daily flow: agent works on a feature branch, `npx oneup-standards pr` (add `--push` to push first) opens the pull request, you review and merge on GitHub, then `npx oneup-standards finish --apply` updates your local `main` and deletes the finished branch. Enable Settings > General > "Automatically delete head branches" so GitHub removes the remote branch. Squash merges make git report the branch as unmerged; `finish` checks the pull request first.
 - Block agents from merging in Claude Code: `permissions.deny` containing `Bash(gh pr merge:*)` in `.claude/settings.json`.
 - Readiness: `init` ends with, and `doctor` prints, a checklist of what is set up and the command for each missing item (gh, `gh auth login`, branch protection, skills, hooks, CI, optional tools).
 - Code security: secret scanning with push protection, Dependabot alerts and security updates.
 - For `updateMode: auto`: Settings → General → **Allow auto-merge**.
 
-Private repositories on a free personal plan cannot enforce rulesets or use CodeQL and secret scanning. See README §4.
+Private repositories on a free personal plan cannot enforce rulesets or use CodeQL and secret scanning. See [README section 9](../README.md#9-make-the-checks-mandatory-on-github).
