@@ -8,6 +8,8 @@ export function makeIo(cwd = process.cwd(), env = {}) {
   return {
     cwd,
     env,
+    // Default: no external process (git, gh) is ever started from tests; tests that need one inject their own.
+    run: async () => ({ code: 127, stdout: '', stderr: '' }),
     stdout: (s) => out.push(s),
     stderr: (s) => err.push(s),
     get out() { return out.join(''); },
