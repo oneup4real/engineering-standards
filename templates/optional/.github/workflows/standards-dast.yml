@@ -1,0 +1,34 @@
+# Opt-in (npx oneup-standards add dast): OWASP ZAP baseline scan, nightly and on demand, never on pull requests.
+# Needs a running target: a deployed preview/staging URL or a seeded dev server. Set the repository secret
+# (or variable) DAST_TARGET_URL. Never point it at production data. Without it the job skips itself.
+# Passive scan only (baseline); it does not attack. Findings are reported in the job summary; the job does not
+# fail unless the repository variable STANDARDS_DAST_BLOCKING=true is set.
+name: standards-dast
+
+on:
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  zap-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET: ${{ secrets.DAST_TARGET_URL || vars.DAST_TARGET_URL }}
+      BLOCKING: ${{ vars.STANDARDS_DAST_BLOCKING }}
+    steps:
+      - name: ZAP baseline
+        run: |
+          if [ -z "$TARGET" ]; then echo "::notice::DAST_TARGET_URL is not set; skipped."; exit 0; fi
+          mkdir zap-out && chmod 777 zap-out
+          STATUS=0
+          docker run --rm -v "$PWD/zap-out:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t "$TARGET" -J report.json -r report.html || STATUS=$?
+          echo "### ZAP baseline for $TARGET (exit $STATUS)" >> "$GITHUB_STEP_SUMMARY"
+          ls zap-out >> "$GITHUB_STEP_SUMMARY"
+          if [ "$STATUS" -ne 0 ] && [ "$BLOCKING" = "true" ]; then exit "$STATUS"; fi
+          [ "$STATUS" -eq 0 ] || echo "::warning::ZAP reported findings (exit $STATUS). Report-only until STANDARDS_DAST_BLOCKING=true."

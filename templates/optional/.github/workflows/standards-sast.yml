@@ -1,0 +1,27 @@
+# Opt-in (npx oneup-standards add sast): Semgrep with the Next.js server-action rules from .semgrep/standards.yml.
+# Reports findings by default. Set the repository variable STANDARDS_SAST_BLOCKING=true to fail the build on findings.
+name: standards-sast
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep-standards:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:1.178.0
+    env:
+      BLOCKING: ${{ vars.STANDARDS_SAST_BLOCKING }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Semgrep standards rules
+        run: |
+          if [ "$BLOCKING" = "true" ]; then FLAG="--error"; else FLAG=""; echo "::notice::SAST is report-only; set STANDARDS_SAST_BLOCKING=true to block."; fi
+          semgrep scan --config .semgrep/standards.yml $FLAG --metrics=off

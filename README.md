@@ -810,7 +810,7 @@ All commands are available via `npx oneup-standards <command>`:
 
 | Command | Arguments / Flags | Description |
 |---|---|---|
-| `init` | `[--yes]` | Interactive setup wizard for new or existing projects (`--yes` accepts recommended answers). |
+| `init` | `[--yes] [--with <features>]` | Interactive setup wizard for new or existing projects (`--yes` accepts recommended answers). |
 | `doctor` | `[--warn-only]` | Diagnoses configuration drift, missing hooks, outdated templates, AI skills, and displays active monotonic ratchets / technical debt. |
 | `upgrade` | `[--merge] [--force] [--dry-run]` | Safely synchronizes template files, hooks, and AI rules. Uses `--merge` to combine customized files, or `--force` to replace. |
 | `sync-skills` | `[--project] [--dry-run]` | Synchronizes plugin skills (`superpowers`, `frontend-design`, `superdesign`, …) into Antigravity (`~/.gemini/config/skills`) and installs the package's own skills (`ui-consistency`) for Antigravity and Claude Code (`~/.claude/skills`). |
@@ -822,6 +822,7 @@ All commands are available via `npx oneup-standards <command>`:
 | `check-tests-changed` | `--base <git-ref>` | Enforces TDD by failing if source code changed without corresponding test modifications. |
 | `check-diff-coverage` | `--base <ref> [--min 80]` | Fails if newly added or modified lines have less than the required test coverage percentage. |
 | `hook` | `pre-commit \| pre-push` | Executes git hook sequences orchestrated by Husky. |
+| `add` | `<sast\|sca\|mutation\|dast\|all> [--force] [--dry-run]` | Opt-in security templates, never installed by default: Semgrep rules for server actions + CI job, `npm audit` severity gate, Stryker config + changed-files CI job, nightly OWASP ZAP baseline. Same via `init --with sast,sca`. All report only until a repository variable switches blocking on (see `docs/adoption.md`). |
 
 ---
 

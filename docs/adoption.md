@@ -26,6 +26,25 @@ Suggested order for a project with many findings:
 3. Guard every server action.
 4. Clean up architecture violations until the baseline file is empty, then delete it.
 
+## Opt-in security checks (SAST, SCA, mutation, DAST)
+
+None of these is on by default. Add what the project needs; each one only reports until you switch blocking on.
+
+```bash
+npx oneup-standards add sast        # .semgrep/standards.yml + .github/workflows/standards-sast.yml
+npx oneup-standards add sca mutation dast
+npx oneup-standards init --with sast,sca   # same, during setup
+```
+
+| Feature | Files | Report-only until (repository variable) | Notes |
+|---|---|---|---|
+| `sast` | `.semgrep/standards.yml`, `standards-sast.yml` | `STANDARDS_SAST_BLOCKING=true` | Rules: missing auth guard in server actions, `dangerouslySetInnerHTML`, unsanitized HTML sinks, `Math.random()` for tokens/credentials, `error.message` returned from actions. Heuristics: review the hits; suppress a reviewed one with `// nosemgrep: <id> - <reason>`. |
+| `sca` | `standards-sca.yml` | `STANDARDS_SCA_BLOCKING=true`; level `STANDARDS_AUDIT_LEVEL` (default `high`) | `npm audit --omit=dev`, weekly and on every PR. |
+| `mutation` | `stryker.config.mjs`, `standards-mutation.yml` | `STANDARDS_MUTATION_BREAK=<percent>` | Install `@stryker-mutator/core` and `@stryker-mutator/vitest-runner`. CI mutates only the files changed in the PR (`STRYKER_MUTATE`). Use it for T3 test-quality review. |
+| `dast` | `standards-dast.yml` | `STANDARDS_DAST_BLOCKING=true` | OWASP ZAP baseline (passive) nightly and on demand, never on PRs. Needs a reachable target in the secret/variable `DAST_TARGET_URL`: a deployed staging/preview or a `dev:seeded` server exposed to the runner. Never production data. Skips itself without a target. |
+
+Files that already exist are not overwritten (`--force` replaces and keeps `.bak`). `doctor` shows which are present (as hints).
+
 ## Personal AI setup (once per machine)
 
 ```bash
