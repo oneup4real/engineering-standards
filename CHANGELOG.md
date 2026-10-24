@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.7.4] - 2026-10-24
+
+### Added
+- **Local default-branch guard.** `hook pre-push` reads the pushed refs from stdin and refuses a push to (or delete of) `main`, `master` or the default branch (`hooks.defaultBranch`, else `git symbolic-ref refs/remotes/origin/HEAD`, else `main`). Feature branches, tags and branch deletes pass. Human override: `ONEUP_ALLOW_DEFAULT_PUSH=1`. Opt out: `hooks.protectDefaultBranch: false`. Needed because GitHub branch protection is not available for private repositories on the free plan. The husky template already forwards stdin; nothing to change in existing projects (`upgrade` is only needed for projects without the pre-push hook).
+- `doctor` readiness line "Local default-branch guard" (hook installed and not disabled).
+- README "Two levels of protection" (local guard vs `protect-branch`), also in `docs/adoption.md`; `AGENTS.global.md`: agents never set the override or use `--no-verify`.
+
+### Changed
+- `doctor` shows branch protection as `n/a` ("not available on this plan (private repo, free plan)...") when GitHub answers "Upgrade to GitHub Pro or make this repository public"; `protect-branch --apply` exits 2 with the same explanation instead of a generic refusal.
+
 ## [1.7.3] - 2026-10-24
 
 ### Changed
