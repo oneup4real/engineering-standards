@@ -64,7 +64,9 @@ mechanical UI work, unbounded fix loops, and recurring findings (test gaps, wron
 
 Legend: amber = human, blue = agent, green = tool/CI, red outline = gate or decision; the node text names the actor. Swimlane view: see the RACI table. Model roles: `strong`, `mid`, `small` (never product names).
 
-### (a) Big picture: gates G0 to G6
+### (a) Big picture: gates G0 to G6 in two parts
+
+**Part 1: Specify and plan (G0-G2)**
 
 ```mermaid
 flowchart LR
@@ -72,27 +74,34 @@ flowchart LR
     classDef agent fill:#a9cdf5,stroke:#1f5fa8,color:#000
     classDef tool fill:#a8e0b0,stroke:#23753a,color:#000
     classDef gate fill:#fff,stroke:#d32f2f,stroke-width:3px,color:#000
-    G0["G0 Human: request<br/>Agent: tier T0-T3"]:::human
-    G1["G1 Agent: spec<br/>and abuse cases"]:::agent
-    D1{"Human:<br/>approved?"}:::gate
-    G2["G2 Agent:<br/>plan"]:::agent
-    G3["G3 Agent: build<br/>with TDD"]:::agent
-    G4["G4 Tool:<br/>CI gates"]:::tool
-    D2{"Green?"}:::gate
-    G5["G5 Agent:<br/>specialist review"]:::agent
-    D3{"Passed?"}:::gate
-    D4{"T3?"}:::gate
-    G6["G6 Human:<br/>approval"]:::human
-    M["Tool: merge,<br/>release"]:::tool
-    G0 --> G1 --> D1
-    D1 -->|Yes| G2 --> G3 --> G4 --> D2
-    D2 -->|Yes| G5 --> D3
-    D3 -->|Yes| D4
-    D4 -->|Yes| G6 --> M
-    D4 -->|No| M
-    D1 -.->|No| G1
-    D2 -.->|"No: fix"| G3
-    D3 -.->|"No: fix, max 2, then human"| G3
+    A["G0 Human:<br/>request"]:::human --> B["G0 Agent:<br/>classify tier"]:::agent
+    B --> C["G1 Agent: spec,<br/>abuse cases"]:::agent
+    C --> D{"G1 Human<br/>approves?"}:::gate
+    D -->|Yes| E["G2 Agent:<br/>plan"]:::agent
+    D -.->|No| C
+    E --> F["to Part 2"]:::agent
+```
+
+Once the plan exists, the work moves to Part 2.
+
+**Part 2: Build, verify, release (G3-G6)**
+
+```mermaid
+flowchart TD
+    classDef human fill:#ffd37a,stroke:#9a6b00,color:#000
+    classDef agent fill:#a9cdf5,stroke:#1f5fa8,color:#000
+    classDef tool fill:#a8e0b0,stroke:#23753a,color:#000
+    classDef gate fill:#fff,stroke:#d32f2f,stroke-width:3px,color:#000
+    A["G3 Agent:<br/>build, TDD"]:::agent --> B["G4 Tool:<br/>CI gates"]:::tool
+    B --> C{"Green?"}:::gate
+    C -->|Yes| D["G5 Agent:<br/>review"]:::agent
+    C -.->|"No: fix"| A
+    D --> E{"Passed?"}:::gate
+    E -.->|"No: fix, max 2,<br/>then human"| A
+    E -->|Yes| F{"T3?"}:::gate
+    F -->|Yes| G["G6 Human:<br/>approval"]:::human
+    F -->|No| H["G6 Tool: merge,<br/>release"]:::tool
+    G --> H
 ```
 
 ### (b) Risk tier: which questions, in which order
