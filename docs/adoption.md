@@ -26,20 +26,23 @@ Suggested order for a project with many findings:
 3. Guard every server action.
 4. Clean up architecture violations until the baseline file is empty, then delete it.
 
-## Opt-in security checks (SAST, SCA, mutation, DAST)
+## Security scans and opt-in checks
 
-None of these is on by default. Add what the project needs; each one only reports until you switch blocking on.
+**One security pipeline.** SAST and SCA are not templates: the shared `security.yml@v1` (called from `ci.yml`) runs gitleaks over the full history, `npm audit --omit=dev` (input `audit-level`, default `high`), Semgrep (`semgrep: true`: registry packs plus our rules) or CodeQL (`codeql: true`), and dependency review.
+
+Our Semgrep rules (`semgrep/standards.yml`: unsanitized HTML sinks, `Math.random()` for secrets, `error.message` returned from actions) reach consumers without copying: the semgrep job fetches that one file from `oneup4real/engineering-standards` at `standards-ref` (default `v1`). A project's own `.semgrep/standards.yml` wins; if the fetch fails the scan runs with the registry packs only. The local `pre-commit` hook scans staged files with the same rules (shipped in the npm package) when `semgrep` is installed (`brew install semgrep`).
+
+Hooks are report-only by default. In `.standardsrc.json`: `"hooks": { "sastBlocking": true, "auditBlocking": true, "auditLevel": "high" }`. `pre-push` audits only when `package-lock.json` changed against the upstream and the network is reachable.
+
+Two checks are opt-in and report-only until you switch blocking on:
 
 ```bash
-npx oneup-standards add sast        # .semgrep/standards.yml + .github/workflows/standards-sast.yml
-npx oneup-standards add sca mutation dast
-npx oneup-standards init --with sast,sca   # same, during setup
+npx oneup-standards add mutation dast
+npx oneup-standards init --with mutation,dast   # same, during setup
 ```
 
 | Feature | Files | Report-only until (repository variable) | Notes |
 |---|---|---|---|
-| `sast` | `.semgrep/standards.yml`, `standards-sast.yml` | `STANDARDS_SAST_BLOCKING=true` | Rules: missing auth guard in server actions, `dangerouslySetInnerHTML`, unsanitized HTML sinks, `Math.random()` for tokens/credentials, `error.message` returned from actions. Heuristics: review the hits; suppress a reviewed one with `// nosemgrep: <id> - <reason>`. |
-| `sca` | `standards-sca.yml` | `STANDARDS_SCA_BLOCKING=true`; level `STANDARDS_AUDIT_LEVEL` (default `high`) | `npm audit --omit=dev`, weekly and on every PR. |
 | `mutation` | `stryker.config.mjs`, `standards-mutation.yml` | `STANDARDS_MUTATION_BREAK=<percent>` | Install `@stryker-mutator/core` and `@stryker-mutator/vitest-runner`. CI mutates only the files changed in the PR (`STRYKER_MUTATE`). Use it for T3 test-quality review. |
 | `dast` | `standards-dast.yml` | `STANDARDS_DAST_BLOCKING=true` | OWASP ZAP baseline (passive) nightly and on demand, never on PRs. Needs a reachable target in the secret/variable `DAST_TARGET_URL`: a deployed staging/preview or a `dev:seeded` server exposed to the runner. Never production data. Skips itself without a target. |
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.7.3] - 2026-10-24
+
+### Changed
+- **One security pipeline.** `security.yml` is the only place for SAST and SCA. Our custom Semgrep rules (now `semgrep/standards.yml`, shipped in the package) are added to its semgrep job: a project's own `.semgrep/standards.yml` first, otherwise the file fetched from this repository at the new input `standards-ref` (default `v1`); if the fetch fails the scan continues with the registry packs.
+- **Hooks, one local place per check.** `hook pre-commit` = forbidden files, gitleaks (staged), lint-staged, then SAST on staged code files with our rules when `semgrep` is installed (one `brew install semgrep` hint otherwise; report-only unless `hooks.sastBlocking`). `hook pre-push` = `tsc --noEmit`, `npm test` once, then `npm audit --omit=dev --audit-level=<hooks.auditLevel, default high>` only when `package-lock.json` changed against the upstream and the network is reachable (offline: one note; report-only unless `hooks.auditBlocking`).
+- **Risk tiers:** T3 no longer starts all five reviewers. T3 = security, logic, test-quality always, ui only for UI paths, architecture only for layer/import/action paths; T2 = logic (+ architecture, test-quality, ui by path); T1 = ui; T0 = none (test-quality for guard tests now needs T2 or higher). `risk-tier`, README, `AGENTS.global.md` 1b and `factory-review` say the same.
+- `doctor`: recognises `security.yml` usage (`semgrep`/`codeql` inputs, audit job) and own CodeQL, Semgrep or `npm audit` setups; hints `sast` / `sca` only when none is present; new hint `hook-duplicate-checks` when a project's `.husky/pre-commit` also runs `tsc` or tests (lists the lines to remove).
+- README: one "Check matrix" (check x local pre-commit / pre-push / CI / nightly / reviewer) and the rule that every check has one local place and runs authoritatively in CI; SAST and SCA are no longer described as opt-in. `docs/architecture.md`: table "Which check owns which risk". `AGENTS.global.md`: the same rule in two lines.
+- Reviewer principles have stable ids (`ARCH-1`, `UI-2`, `LOGIC-3`, `SEC-4`, `TQ-5` ...) in `skills/factory-review/references/*.md`; the README "What each reviewer checks" cites them and `test/reviewer-ids.test.js` fails when the two drift.
+
+### Removed
+- `add sast`, `add sca` and `init --with sast,sca`; templates `standards-sast.yml` and `standards-sca.yml`; readiness items and doctor hints for them. Mutation and DAST stay opt-in. Migration: nothing to do for projects that call `security.yml@v1`; delete `.semgrep/standards.yml`, `standards-sast.yml` and `standards-sca.yml` if you installed them from 1.7.x.
+- Semgrep rules `server-action-missing-auth-guard` (owned by the arch suite action-guard check) and `react-dangerously-set-inner-html` (owned by ESLint `no-restricted-syntax`). Kept: `unsanitized-html-sink`, `insecure-random-for-secret`, `server-action-error-message-passthrough`.
+
 ## [1.7.2] - 2026-10-24
 
 ### Changed (docs only, no behaviour change)

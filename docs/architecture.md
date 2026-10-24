@@ -13,6 +13,24 @@
 
 Enforced by `depcruise/layered.cjs`, the ESLint security rules and `arch/suite.js`.
 
+## Which check owns which risk
+
+One owner per risk; the others do not repeat it. Custom Semgrep rules exist only where ESLint and the arch suite cannot see the risk.
+
+| Risk | Owner | Not duplicated by |
+|---|---|---|
+| Exported server action without a caller check | arch suite `checkActionGuards` (`arch-action-gaps`, `@public-action` marker) | no Semgrep rule (the former `server-action-missing-auth-guard` was removed) |
+| `dangerouslySetInnerHTML` | ESLint `no-restricted-syntax` (`eslint/security.js`, every use is an error) | no Semgrep rule (the former one was removed) |
+| Direct client DB writes, seed data in `src/`, `NEXT_PUBLIC_*` secrets, `eval` | ESLint `no-restricted-imports` / `no-restricted-syntax` | - |
+| Layer and import violations | dependency-cruiser, arch suite | - |
+| `innerHTML`, `outerHTML`, `document.write`, `insertAdjacentHTML` with dynamic values | Semgrep `unsanitized-html-sink` | ESLint does not cover these |
+| `Math.random()` for tokens, passwords, nonces | Semgrep `insecure-random-for-secret` | no ESLint or arch rule |
+| `error.message` returned from a server action | Semgrep `server-action-error-message-passthrough` | the arch suite checks guards, not return values |
+| Known insecure patterns (SSRF, injection, taint) | Semgrep registry packs or CodeQL | - |
+| Committed secrets | gitleaks (staged locally, full history in CI) | - |
+| Vulnerable dependencies | `npm audit` and dependency review (`security.yml`; `pre-push` only on lockfile change) | - |
+| Missing or empty tests | `check-tests-changed`, diff coverage, mutation (opt-in) | - |
+
 ## A write, end to end
 
 ```

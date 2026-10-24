@@ -51,6 +51,8 @@ Every non-trivial task (more than a single 5-line edit) MUST follow this structu
 
 4. **Phase 4: Final Verification & Evidence (`verification-before-completion`):**
    - Locally run only the fast checks (typecheck, changed tests). The full gate set (lint, tests, coverage, depcruise, build, bundle, SAST) runs once in CI; cite its output.
+   - Every check has exactly one local place (pre-commit or pre-push) and runs authoritatively in CI; local is a faster subset.
+   - Reviewers read the check output and never re-run it.
 
 5. **Universal Rules:**
    - **Clarify before coding.** If a requirement or compliance interpretation is unclear, ask.
