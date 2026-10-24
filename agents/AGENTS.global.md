@@ -77,6 +77,7 @@ Classify every task at the start and state the tier in the plan. The highest mat
 
 - Model roles, never product names: `strong` = spec, architecture, T3 security review, final approver; `mid` = T2/T3 builder, standard reviewers; `small` = mechanical edits, T0/T1 builder, doc and format fixes. Escalate a role only after a failed round.
 - Tools before agents: lint, types, tests, coverage, depcruise, SAST, secret scan, bundle check decide first; an LLM reviewer never repeats what a tool proves.
+- `npx oneup-standards risk-tier --base origin/main` classifies the diff and names the reviewers; use it at G0 and again before review.
 - Review triggers by path (auth, rules, actions, payments, money, `src/components`, `src/server`); every T3 review answers OWASP Web Top 10 and API Security Top 10 with one line per applicable item.
 - `npm run test:unit` must run the same test project as CI. Numbers and counts claimed in docs must be verified by script where possible.
 

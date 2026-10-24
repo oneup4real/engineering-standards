@@ -216,6 +216,18 @@ finding a tool could have caught becomes a tool check; T3 never merges without a
 | G6 | Release | approves at T3 (always); deploys rules and indexes | approver `strong` at T2; none at T0/T1 | branch ruleset | all merges | PR approval, green checks |
 | Feedback | Operate | triages | proposes tool checks for recurring findings | doctor, ratchets | after release | fewer findings of the same kind |
 
+**G0 by tool: `npx oneup-standards risk-tier [--base <ref>] [--json]`.** It classifies the diff by changed paths
+(highest tier of any file wins; exit code 0) and prints the tier, the reviewers to run and whether a human approval
+is required (T3 always). The orchestrator and CI use it to decide the review fan-out. Defaults: T3 = `src/app/actions/**`,
+`src/server/**`, `*.rules`, `**/auth*`, email templates, and paths containing money/payment/fee/role/token-style
+keywords; T2 = `src/lib/**`, `src/domain/**` and unknown source paths; T1 = `src/components/**`, styles; T0 = docs,
+tests, config (tests of guards or money still trigger `test-quality`). Replace the globs of a tier per project in
+`.standardsrc.json`:
+
+```json
+{ "riskTiers": { "T3": ["src/server/**", "billing/**"], "keywords": ["payment", "role"] } }
+```
+
 ### Reviewer roles
 
 | Reviewer | Trigger paths | Model | Checklist | Tool-first checks (read, not re-run) |
@@ -822,6 +834,7 @@ All commands are available via `npx oneup-standards <command>`:
 | `check-tests-changed` | `--base <git-ref>` | Enforces TDD by failing if source code changed without corresponding test modifications. |
 | `check-diff-coverage` | `--base <ref> [--min 80]` | Fails if newly added or modified lines have less than the required test coverage percentage. |
 | `hook` | `pre-commit \| pre-push` | Executes git hook sequences orchestrated by Husky. |
+| `risk-tier` | `[--base <ref>] [--json] [paths...]` | Classifies the diff into T0-T3 by changed paths (globs configurable under `riskTiers` in `.standardsrc.json`), prints tier, reviewers and whether a human approval is required. Always exits 0 (2 on usage errors). |
 | `add` | `<sast\|sca\|mutation\|dast\|all> [--force] [--dry-run]` | Opt-in security templates, never installed by default: Semgrep rules for server actions + CI job, `npm audit` severity gate, Stryker config + changed-files CI job, nightly OWASP ZAP baseline. Same via `init --with sast,sca`. All report only until a repository variable switches blocking on (see `docs/adoption.md`). |
 
 ---
