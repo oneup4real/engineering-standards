@@ -158,3 +158,81 @@ describe('prePush SCA', () => {
     expect(deps.calls.some((c) => c.startsWith('npm audit'))).toBe(false);
   });
 });
+
+describe('prePush default-branch guard', () => {
+  const Z = '0'.repeat(40);
+  const A = 'a'.repeat(40);
+  const line = (remoteRef, localSha = A, localRef = 'refs/heads/work') => `${localRef} ${localSha} ${remoteRef} ${Z}\n`;
+  const guarded = (stdin, { config = {}, head = 'refs/remotes/origin/main' } = {}) => ({
+    ...fakeDeps(),
+    readStdin: async () => stdin,
+    readConfig: async () => config,
+    defaultBranch: async () => head,
+  });
+  const MSG = 'Direct pushes to main are blocked by the standards. Push a feature branch and open a pull request: npx oneup-standards pr. Humans can override once: ONEUP_ALLOW_DEFAULT_PUSH=1 git push ...';
+
+  it('lets a feature branch through to the normal checks', async () => {
+    const deps = guarded(line('refs/heads/feat/x'));
+    expect(await prePush(makeIo(), deps)).toBe(0);
+    expect(deps.calls).toEqual(['npx --no-install tsc --noEmit', 'npm test --silent']);
+  });
+
+  it('refuses a push to the default branch before running any check', async () => {
+    const deps = guarded(line('refs/heads/main'));
+    const io = makeIo();
+    expect(await prePush(io, deps)).toBe(1);
+    expect(deps.calls).toEqual([]);
+    expect(io.err).toContain(MSG);
+  });
+
+  it('refuses master as well', async () => {
+    expect(await prePush(makeIo(), guarded(line('refs/heads/master')))).toBe(1);
+  });
+
+  it('allows the push with the human override env', async () => {
+    const deps = guarded(line('refs/heads/main'));
+    expect(await prePush(makeIo(process.cwd(), { ONEUP_ALLOW_DEFAULT_PUSH: '1' }), deps)).toBe(0);
+  });
+
+  it('only the exact value 1 overrides', async () => {
+    expect(await prePush(makeIo(process.cwd(), { ONEUP_ALLOW_DEFAULT_PUSH: 'true' }), guarded(line('refs/heads/main')))).toBe(1);
+  });
+
+  it('allows deleting a remote feature branch, without running the checks', async () => {
+    const deps = guarded(`(delete) ${Z} refs/heads/feat/x ${A}\n`);
+    expect(await prePush(makeIo(), deps)).toBe(0);
+    expect(deps.calls).toEqual([]);
+  });
+
+  it('refuses deleting the default branch', async () => {
+    expect(await prePush(makeIo(), guarded(`(delete) ${Z} refs/heads/main ${A}\n`))).toBe(1);
+  });
+
+  it('allows tag pushes', async () => {
+    expect(await prePush(makeIo(), guarded(line('refs/tags/v1.0.0', A, 'refs/tags/v1.0.0')))).toBe(0);
+  });
+
+  it('refuses when one of several refs is the default branch', async () => {
+    expect(await prePush(makeIo(), guarded(line('refs/heads/feat/x') + line('refs/heads/main')))).toBe(1);
+  });
+
+  it('does not guard when hooks.protectDefaultBranch is false', async () => {
+    expect(await prePush(makeIo(), guarded(line('refs/heads/main'), { config: { hooks: { protectDefaultBranch: false } } }))).toBe(0);
+  });
+
+  it('protects a default branch other than main (origin/HEAD), and main stays protected', async () => {
+    const head = 'refs/remotes/origin/develop';
+    const io = makeIo();
+    expect(await prePush(io, guarded(line('refs/heads/develop'), { head }))).toBe(1);
+    expect(io.err).toContain('Direct pushes to develop are blocked');
+    expect(await prePush(makeIo(), guarded(line('refs/heads/main'), { head }))).toBe(1);
+  });
+
+  it('hooks.defaultBranch overrides origin/HEAD', async () => {
+    expect(await prePush(makeIo(), guarded(line('refs/heads/trunk'), { config: { hooks: { defaultBranch: 'trunk' } } }))).toBe(1);
+  });
+
+  it('falls back to main when origin/HEAD cannot be resolved', async () => {
+    expect(await prePush(makeIo(), guarded(line('refs/heads/main'), { head: null }))).toBe(1);
+  });
+});
